@@ -1,0 +1,22 @@
+{
+  "name": "test-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+  "vars": {
+    "ENV": "test"
+  },
+  "kv_namespaces": [
+    { "binding": "KV", "id": "abc123" }
+  ],
+  "d1_databases": [
+    { "binding": "DB", "database_id": "def456", "database_name": "mydb" }
+  ],
+  "env": {
+    "staging": {
+      "vars": { "ENV": "staging" }
+    },
+    "production": {
+      "vars": { "ENV": "production" }
+    }
+  }
+}

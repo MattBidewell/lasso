@@ -1,5 +1,6 @@
 # lasso
-A tui for interacting and modifying cloudflare wrangler files in a project.
+
+Lasso is a TUI (Terminal User Interface) for managing Cloudflare Wrangler configs in monorepos. Here's how it's structured
 
 ## Development
 

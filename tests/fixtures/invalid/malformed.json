@@ -1,0 +1,4 @@
+{
+  "name": "broken",
+  "main": "src/index.ts"
+  // Missing closing brace - invalid JSON

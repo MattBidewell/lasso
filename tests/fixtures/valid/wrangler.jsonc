@@ -1,0 +1,11 @@
+{
+  // This is a JSONC file with comments
+  "name": "test-worker-jsonc",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-01-01",
+  /* Multi-line
+     comment */
+  "vars": {
+    "ENV": "test"
+  }
+}

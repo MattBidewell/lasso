@@ -1,20 +1,15 @@
-import {
-  ASCIIFont,
-  Box,
-  createCliRenderer,
-  Text,
-  TextAttributes,
-} from "@opentui/core";
+#!/usr/bin/env node
+import { parseArgs } from "./cli/index.ts";
+import { LassoApp } from "./app.ts";
 
-const renderer = await createCliRenderer({ exitOnCtrlC: true });
+async function main(): Promise<void> {
+  const { targetPath, watchEnabled } = parseArgs();
 
-renderer.root.add(
-  Box(
-    { alignItems: "center", justifyContent: "center", flexGrow: 1 },
-    Box(
-      { justifyContent: "center", alignItems: "flex-end" },
-      ASCIIFont({ font: "tiny", text: "OpenTUI" }),
-      Text({ content: "What will you build?", attributes: TextAttributes.DIM }),
-    ),
-  ),
-);
+  const app = new LassoApp(targetPath, watchEnabled);
+  await app.start();
+}
+
+main().catch((err) => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});

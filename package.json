@@ -1,18 +1,43 @@
 {
   "name": "lasso",
-  "module": "src/index.tsx",
+  "version": "0.1.0",
+  "description": "TUI for managing Cloudflare Wrangler configs in monorepos",
   "type": "module",
-  "private": true,
+  "bin": {
+    "lasso": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "dev": "bun run --watch src/index.ts"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "dev": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target node --minify",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
-    "@opentui/core": "^0.1.75"
-  }
+    "@opentui/core": "^0.1.75",
+    "chokidar": "^3.6.0",
+    "fast-glob": "^3.3.2",
+    "strip-json-comments": "^5.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "wrangler",
+    "tui",
+    "cli",
+    "monorepo"
+  ],
+  "license": "MIT"
 }

@@ -1,0 +1,4 @@
+{
+  "not_a_name": "missing required name field",
+  "main": "src/index.ts"
+}
