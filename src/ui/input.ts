@@ -18,6 +18,9 @@ export type KeyName =
   | "b"
   | "r"
   | "q"
+  | "y"
+  | "a"
+  | "n"
   | "?";
 
 export function parseKeyEvent(event: KeyEvent): KeyName | null {
@@ -43,4 +46,8 @@ export function parseKeyEvent(event: KeyEvent): KeyName | null {
 
 export function isCtrlC(event: KeyEvent): boolean {
   return event.ctrl && event.name === "c";
+}
+
+export function isCtrlD(event: KeyEvent): boolean {
+  return event.ctrl && event.name === "d";
 }

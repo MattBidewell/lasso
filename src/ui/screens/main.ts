@@ -4,29 +4,38 @@ import { COLORS } from "../../themes/index.ts";
 import { renderConfigListPanel } from "../panels/config-list.ts";
 import { renderConfigDetailPanel } from "../panels/config-detail.ts";
 import { renderOutputPanel } from "../panels/output.ts";
+import { renderDeployConfirmModal } from "../modals/index.ts";
 
 export function renderMainScreen(state: AppState) {
+  const showOutput = state.isRunning || state.isDeploying || state.output.length > 0;
+
   return Box(
     {
       flexGrow: 1,
       flexDirection: "column",
     },
-    // Top section: split panels
+    // Main content area: left panel + right column
     Box(
       {
         flexGrow: 1,
         flexDirection: "row",
         gap: 1,
       },
-      // Left panel: config list
+      // Left panel: config list (full height)
       renderConfigListPanel(state),
-      // Right panel: config details
-      renderConfigDetailPanel(state),
+      // Right column: details + output stacked
+      Box(
+        {
+          flexGrow: 1,
+          flexDirection: "column",
+          gap: 1,
+        },
+        // Config details (top half)
+        renderConfigDetailPanel(state),
+        // Output panel (bottom half, only when has content)
+        ...(showOutput ? [renderOutputPanel(state)] : []),
+      ),
     ),
-    // Bottom panel: output (only when running or has output)
-    ...(state.isRunning || state.output.length > 0
-      ? [renderOutputPanel(state)]
-      : []),
     // Status bar
     Box(
       {
@@ -39,12 +48,18 @@ export function renderMainScreen(state: AppState) {
         vstyles.dim(
           state.focusedPanel === 'configs'
             ? "j/k navigate  l/→/Enter select  r refresh  q quit"
-            : "j/k navigate  Enter run  h/←/Esc back  q quit",
+            : state.focusedPanel === 'environments'
+            ? "j/k navigate  Enter run  ^D deploy  h/←/Esc back  q quit"
+            : "j/k scroll  h/←/Esc back  q quit",
         ),
       ),
       ...(state.statusMessage
         ? [Text({}, vstyles.color(COLORS.success, state.statusMessage))]
         : []),
     ),
+    // Modal overlay
+    ...(state.modal?.type === 'deploy-confirm'
+      ? [renderDeployConfirmModal(state.modal)]
+      : []),
   );
 }

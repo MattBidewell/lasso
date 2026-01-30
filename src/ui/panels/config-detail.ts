@@ -10,12 +10,12 @@ export function renderConfigDetailPanel(state: AppState) {
   if (!selected) {
     return Box(
       {
-        flexGrow: 2,
+        flexGrow: 1,
         flexDirection: "column",
         border: true,
         borderStyle: "rounded",
         borderColor: COLORS.border,
-        padding: 1,
+        padding: 0,
         title: " Details ",
         titleAlignment: "left",
       },
@@ -27,7 +27,7 @@ export function renderConfigDetailPanel(state: AppState) {
 
   return Box(
     {
-      flexGrow: 2,
+      flexGrow: 1,
       flexDirection: "column",
       border: true,
       borderStyle: "rounded",
@@ -60,7 +60,8 @@ export function renderConfigDetailPanel(state: AppState) {
 
       return Box(
         {
-          backgroundColor: isSelected && isFocused ? COLORS.selectedBg : undefined,
+          backgroundColor:
+            isSelected && isFocused ? COLORS.selectedBg : undefined,
         },
         Text(
           {},
@@ -75,10 +76,7 @@ export function renderConfigDetailPanel(state: AppState) {
     // Bindings summary
     ...(bindings
       ? [
-          Text(
-            { marginTop: 1 },
-            vstyles.color(COLORS.title, "Bindings:"),
-          ),
+          Text({ marginTop: 1 }, vstyles.color(COLORS.title, "Bindings:")),
           Text(
             {},
             vstyles.dim(

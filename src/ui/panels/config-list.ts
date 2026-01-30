@@ -7,7 +7,7 @@ export function renderConfigListPanel(state: AppState) {
 
   return Box(
     {
-      flexGrow: 1,
+      width: 25,
       flexDirection: "column",
       border: true,
       borderStyle: "rounded",
@@ -25,7 +25,8 @@ export function renderConfigListPanel(state: AppState) {
 
       return Box(
         {
-          backgroundColor: isSelected && isFocused ? COLORS.selectedBg : undefined,
+          backgroundColor:
+            isSelected && isFocused ? COLORS.selectedBg : undefined,
         },
         Text(
           {},
@@ -39,9 +40,7 @@ export function renderConfigListPanel(state: AppState) {
     }),
     // Empty state
     ...(state.configs.length === 0
-      ? [
-          Text({ marginTop: 1 }, vstyles.dim("No configs found")),
-        ]
+      ? [Text({ marginTop: 1 }, vstyles.dim("No configs found"))]
       : []),
   );
 }

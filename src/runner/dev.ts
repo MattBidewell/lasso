@@ -1,6 +1,10 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 
+// Strip ANSI escape codes from output
+const stripAnsi = (str: string): string =>
+  str.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
+
 export interface RunDevOptions {
   configPath: string;
   environment?: string;
@@ -22,19 +26,20 @@ export function runWranglerDev(options: RunDevOptions): ChildProcess {
   const proc = spawn('npx', args, {
     cwd,
     shell: true,
-    stdio: ['inherit', 'pipe', 'pipe'],
+    detached: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
-      FORCE_COLOR: '1',
+      NO_COLOR: '1',
     },
   });
 
   proc.stdout?.on('data', (data: Buffer) => {
-    onStdout(data.toString());
+    onStdout(stripAnsi(data.toString()));
   });
 
   proc.stderr?.on('data', (data: Buffer) => {
-    onStderr(data.toString());
+    onStderr(stripAnsi(data.toString()));
   });
 
   proc.on('exit', (code) => {
