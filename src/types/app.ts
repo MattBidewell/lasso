@@ -35,6 +35,7 @@ export interface DiscoveredConfig {
 }
 
 export type Panel = 'configs' | 'environments' | 'output';
+export type RightPanelView = 'about' | 'output';
 
 export interface AppState {
   configs: DiscoveredConfig[];
@@ -58,6 +59,12 @@ export interface AppState {
   cwd: string;
   /** Modal state for confirmations */
   modal: ModalState | null;
+  /** Scroll offset for configs list */
+  configsScrollOffset: number;
+  /** Scroll offset for environments list */
+  environmentsScrollOffset: number;
+  /** Which view to show in right panel */
+  rightPanelView: RightPanelView;
 }
 
 export type AppAction =
@@ -73,7 +80,10 @@ export type AppAction =
   | { type: 'SET_CURRENT_COMMAND'; payload: CommandType }
   | { type: 'SET_MODAL'; payload: ModalState | null }
   | { type: 'APPEND_OUTPUT'; payload: string }
-  | { type: 'CLEAR_OUTPUT' };
+  | { type: 'CLEAR_OUTPUT' }
+  | { type: 'SET_CONFIGS_SCROLL'; payload: number }
+  | { type: 'SET_ENVIRONMENTS_SCROLL'; payload: number }
+  | { type: 'SET_RIGHT_PANEL_VIEW'; payload: RightPanelView };
 
 export function createInitialState(cwd: string): AppState {
   return {
@@ -91,6 +101,9 @@ export function createInitialState(cwd: string): AppState {
     outputByConfig: {},
     cwd,
     modal: null,
+    configsScrollOffset: 0,
+    environmentsScrollOffset: 0,
+    rightPanelView: 'about',
   };
 }
 
@@ -155,6 +168,15 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
     case 'CLEAR_OUTPUT':
       return { ...state, output: [] };
+
+    case 'SET_CONFIGS_SCROLL':
+      return { ...state, configsScrollOffset: action.payload };
+
+    case 'SET_ENVIRONMENTS_SCROLL':
+      return { ...state, environmentsScrollOffset: action.payload };
+
+    case 'SET_RIGHT_PANEL_VIEW':
+      return { ...state, rightPanelView: action.payload };
 
     default:
       return state;

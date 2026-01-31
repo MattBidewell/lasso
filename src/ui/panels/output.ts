@@ -1,4 +1,4 @@
-import { Box, Text, ScrollBox, vstyles } from "@opentui/core";
+import { ScrollBox, Text, vstyles } from "@opentui/core";
 import type { AppState } from "../../types/app.ts";
 import { COLORS } from "../../themes/index.ts";
 
@@ -20,12 +20,9 @@ export function renderOutputPanel(state: AppState) {
   let title: string;
   let borderColor: string;
 
-  // Calculate visible output based on scroll offset
-  const visibleOutput = state.output;
-
   if (isFocused) {
     title = " Output (focused) ";
-    borderColor = COLORS.selected;
+    borderColor = COLORS.activeBorder;
   } else if (state.isDeploying) {
     title = " Output (deploying) ";
     borderColor = COLORS.accent;
@@ -34,19 +31,26 @@ export function renderOutputPanel(state: AppState) {
     borderColor = COLORS.success;
   } else {
     title = " Output (stopped) ";
-    borderColor = COLORS.border;
+    borderColor = COLORS.inactiveBorder;
   }
 
-  return Box(
+  return ScrollBox(
     {
+      id: "output-scrollbox",
       flexGrow: 1,
-      flexDirection: "column",
-      border: true,
-      borderStyle: "rounded",
-      borderColor,
-      padding: 1,
-      title,
-      titleAlignment: "left",
+      scrollY: true,
+      scrollX: false,
+      stickyScroll: true,
+      stickyStart: "bottom",
+      viewportCulling: true,
+      rootOptions: {
+        border: true,
+        borderStyle: "rounded",
+        borderColor,
+        padding: 1,
+        title,
+        titleAlignment: "left",
+      },
     },
     // Command
     Text(
@@ -54,15 +58,13 @@ export function renderOutputPanel(state: AppState) {
       vstyles.dim("$ "),
       vstyles.color(COLORS.normal, command),
     ),
-    // Output area
-    ScrollBox(
-      {
-        flexGrow: 1,
-        stickyStart: "bottom",
-      },
-      ...visibleOutput.map((line, i) =>
-        Text({ id: `output-${i}` }, vstyles.color(COLORS.normal, line)),
-      ),
+    // Output lines - render all, ScrollBox handles viewport and auto-scroll to bottom
+    ...state.output.map((line, i) =>
+      Text({ id: `output-${i}` }, vstyles.color(COLORS.normal, line)),
     ),
+    // Empty state
+    ...(state.output.length === 0
+      ? [Text({}, vstyles.dim("No output yet"))]
+      : []),
   );
 }

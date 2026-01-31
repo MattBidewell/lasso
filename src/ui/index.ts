@@ -3,6 +3,8 @@ export { parseKeyEvent, isCtrlC, isCtrlD, type KeyEvent, type KeyName } from "./
 export { renderMainScreen } from "./screens/index.ts";
 export {
   renderConfigListPanel,
-  renderConfigDetailPanel,
+  renderEnvironmentsPanel,
+  renderBindingsPanel,
+  renderAboutPanel,
   renderOutputPanel,
 } from "./panels/index.ts";

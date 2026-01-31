@@ -1,35 +1,88 @@
-import type { ChildProcess } from "node:child_process";
-import { createCliRenderer, type CliRenderer } from "@opentui/core";
+import {
+  createCliRenderer,
+  ScrollBoxRenderable,
+  type CliRenderer,
+} from "@opentui/core";
 import type { FSWatcher } from "chokidar";
 import {
   findWranglerConfigs,
   parseConfig,
   watchWranglerConfigs,
 } from "./discovery/index.ts";
-import {
-  runWranglerDev,
-  runWranglerDeploy,
-  runWranglerDeployAll,
-  stopProcess,
-} from "./runner/index.ts";
+import { ProcessController } from "./runner/index.ts";
+import { InputHandler } from "./input/index.ts";
 import {
   type AppState,
   type DeployScope,
   createInitialState,
 } from "./types/app.ts";
-import { parseKeyEvent, isCtrlC, isCtrlD, renderMainScreen } from "./ui/index.ts";
+import {
+  parseKeyEvent,
+  isCtrlC,
+  isCtrlD,
+  renderMainScreen,
+} from "./ui/index.ts";
 
 export class LassoApp {
   private renderer: CliRenderer | null = null;
   private state: AppState;
   private watcher: FSWatcher | null = null;
-  private runningProcess: ChildProcess | null = null;
-  private deployCancel: (() => void) | null = null;
   private watchEnabled: boolean;
+  private renderScheduled = false;
+  private processController: ProcessController;
+  private inputHandler: InputHandler;
 
   constructor(cwd: string, watchEnabled: boolean) {
     this.state = createInitialState(cwd);
     this.watchEnabled = watchEnabled;
+
+    // Initialize process controller
+    this.processController = new ProcessController({
+      onOutputLine: (line) => {
+        this.state.output.push(line);
+      },
+      onDevStart: () => {
+        this.state.isRunning = true;
+        this.state.currentCommand = "dev";
+        this.state.output = [];
+        this.state.outputScrollOffset = 0;
+      },
+      onDevEnd: () => {
+        this.state.isRunning = false;
+      },
+      onDeployStart: () => {
+        this.state.isDeploying = true;
+        this.state.currentCommand = "deploy";
+        this.state.output = [];
+        this.state.outputScrollOffset = 0;
+      },
+      onDeployEnd: () => {
+        this.state.isDeploying = false;
+      },
+      onRender: () => this.render(),
+    });
+
+    // Initialize input handler
+    this.inputHandler = new InputHandler(
+      () => this.state,
+      (updates) => Object.assign(this.state, updates),
+      {
+        onQuit: () => {
+          this.processController.stopAll();
+          this.cleanup();
+        },
+        onRefresh: () => this.refresh(),
+        onStartDev: () => this.startDevServer(),
+        onShowDeployModal: () => this.showDeployModal(),
+        onCloseModal: () => this.closeModal(),
+        onStartDeploy: (scope) => this.startDeploy(scope),
+        onStateChange: () => this.scheduleRender(),
+        onRender: () => this.render(),
+        onScrollToSelection: (panel, index) =>
+          this.scrollToSelection(panel, index),
+        onScrollOutput: (delta) => this.scrollOutput(delta),
+      },
+    );
   }
 
   async start(): Promise<void> {
@@ -38,7 +91,7 @@ export class LassoApp {
 
     this.renderer = await createCliRenderer({
       exitOnCtrlC: false,
-      useMouse: false,
+      useMouse: true,
       useAlternateScreen: true,
     });
 
@@ -60,11 +113,11 @@ export class LassoApp {
     this.renderer.keyInput.on("keypress", (event) => {
       if (isCtrlC(event)) {
         if (this.state.isDeploying) {
-          this.stopDeploy();
+          this.processController.stopDeploy();
           return;
         }
-        if (this.state.isRunning && this.runningProcess) {
-          this.stopDevServer();
+        if (this.state.isRunning) {
+          this.processController.stopDevServer();
           return;
         }
         this.cleanup();
@@ -72,7 +125,11 @@ export class LassoApp {
       }
 
       if (isCtrlD(event)) {
-        if (!this.state.modal && !this.state.isRunning && !this.state.isDeploying) {
+        if (
+          !this.state.modal &&
+          !this.state.isRunning &&
+          !this.state.isDeploying
+        ) {
           this.showDeployModal();
         }
         return;
@@ -80,18 +137,18 @@ export class LassoApp {
 
       const key = parseKeyEvent(event);
       if (key) {
-        this.handleKeyPress(key);
+        this.inputHandler.handleKeyPress(key);
       }
     });
 
     this.renderer.addInputHandler((sequence: string) => {
       if (sequence === "\x03") {
         if (this.state.isDeploying) {
-          this.stopDeploy();
+          this.processController.stopDeploy();
           return true;
         }
-        if (this.state.isRunning && this.runningProcess) {
-          this.stopDevServer();
+        if (this.state.isRunning) {
+          this.processController.stopDevServer();
           return true;
         }
         this.cleanup();
@@ -99,197 +156,17 @@ export class LassoApp {
       }
       // Ctrl+D
       if (sequence === "\x04") {
-        if (!this.state.modal && !this.state.isRunning && !this.state.isDeploying) {
+        if (
+          !this.state.modal &&
+          !this.state.isRunning &&
+          !this.state.isDeploying
+        ) {
           this.showDeployModal();
         }
         return true;
       }
       return false;
     });
-  }
-
-  private handleKeyPress(key: string): void {
-    // Modal takes priority
-    if (this.state.modal) {
-      this.handleModalKeyPress(key);
-      return;
-    }
-
-    // Global keys
-    switch (key) {
-      case "q":
-        this.stopDeploy();
-        this.stopDevServer();
-        this.cleanup();
-        return;
-      case "r":
-        if (this.state.focusedPanel === "configs") {
-          this.refresh();
-          return;
-        }
-        break;
-    }
-
-    // Panel-specific keys
-    if (this.state.focusedPanel === "configs") {
-      this.handleConfigsPanelKey(key);
-    } else if (this.state.focusedPanel === "environments") {
-      this.handleEnvironmentsPanelKey(key);
-    } else if (this.state.focusedPanel === "output") {
-      this.handleOutputPanelKey(key);
-    }
-  }
-
-  private handleModalKeyPress(key: string): void {
-    switch (key) {
-      case "y":
-        this.startDeploy("selected");
-        break;
-      case "a":
-        this.startDeploy("all");
-        break;
-      case "n":
-      case "escape":
-        this.closeModal();
-        break;
-    }
-  }
-
-  private handleConfigsPanelKey(key: string): void {
-    const maxIndex = this.state.configs.length - 1;
-
-    switch (key) {
-      case "j":
-      case "down": {
-        const newIndex = Math.min(this.state.selectedConfigIndex + 1, maxIndex);
-        if (newIndex !== this.state.selectedConfigIndex) {
-          this.switchConfig(newIndex);
-        }
-        break;
-      }
-      case "k":
-      case "up": {
-        const newIndex = Math.max(this.state.selectedConfigIndex - 1, 0);
-        if (newIndex !== this.state.selectedConfigIndex) {
-          this.switchConfig(newIndex);
-        }
-        break;
-      }
-      case "enter":
-      case "l":
-      case "right":
-        if (this.state.configs.length > 0) {
-          const selected = this.state.configs[this.state.selectedConfigIndex];
-          if (selected?.config) {
-            this.state.focusedPanel = "environments";
-            this.state.selectedEnvIndex = 0;
-            this.render();
-          }
-        }
-        break;
-    }
-  }
-
-  private switchConfig(newIndex: number): void {
-    // Save current output to the current config's storage
-    const currentConfig = this.state.configs[this.state.selectedConfigIndex];
-    if (currentConfig && this.state.output.length > 0) {
-      this.state.outputByConfig[currentConfig.path] = [...this.state.output];
-    }
-
-    // Switch to new config
-    this.state.selectedConfigIndex = newIndex;
-    this.state.selectedEnvIndex = 0;
-
-    // Load saved output for the new config, or clear if none
-    const newConfig = this.state.configs[newIndex];
-    const savedOutput = newConfig ? this.state.outputByConfig[newConfig.path] : undefined;
-    if (savedOutput) {
-      this.state.output = [...savedOutput];
-    } else {
-      this.state.output = [];
-      this.state.isRunning = false;
-      this.state.isDeploying = false;
-      this.state.currentCommand = null;
-    }
-    this.state.outputScrollOffset = 0;
-
-    this.render();
-  }
-
-  private handleEnvironmentsPanelKey(key: string): void {
-    const selected = this.state.configs[this.state.selectedConfigIndex];
-    if (!selected) return;
-
-    const maxEnvIndex = selected.environments.length - 1;
-    const hasOutput = this.state.output.length > 0 || this.state.isRunning || this.state.isDeploying;
-
-    switch (key) {
-      case "j":
-      case "down":
-        // If at bottom and output panel exists, go to output
-        if (this.state.selectedEnvIndex >= maxEnvIndex && hasOutput) {
-          this.state.focusedPanel = "output";
-          this.render();
-        } else {
-          this.state.selectedEnvIndex = Math.min(
-            this.state.selectedEnvIndex + 1,
-            maxEnvIndex,
-          );
-          this.render();
-        }
-        break;
-      case "k":
-      case "up":
-        this.state.selectedEnvIndex = Math.max(
-          this.state.selectedEnvIndex - 1,
-          0,
-        );
-        this.render();
-        break;
-      case "enter":
-        this.startDevServer();
-        break;
-      case "h":
-      case "left":
-      case "escape":
-        this.state.focusedPanel = "configs";
-        this.render();
-        break;
-    }
-  }
-
-  private handleOutputPanelKey(key: string): void {
-    const maxScroll = Math.max(0, this.state.output.length - 5); // Keep at least 5 lines visible
-
-    switch (key) {
-      case "k":
-      case "up":
-        // Scroll up (increase offset from bottom)
-        this.state.outputScrollOffset = Math.min(
-          this.state.outputScrollOffset + 1,
-          maxScroll,
-        );
-        this.render();
-        break;
-      case "j":
-      case "down":
-        // Scroll down (decrease offset from bottom)
-        this.state.outputScrollOffset = Math.max(
-          this.state.outputScrollOffset - 1,
-          0,
-        );
-        this.render();
-        break;
-      case "h":
-      case "left":
-      case "escape":
-        // Go back to environments panel
-        this.state.focusedPanel = "environments";
-        this.state.outputScrollOffset = 0; // Reset scroll when leaving
-        this.render();
-        break;
-    }
   }
 
   private setupWatcher(): void {
@@ -364,44 +241,9 @@ export class LassoApp {
     const selected = this.state.configs[this.state.selectedConfigIndex];
     if (!selected?.config) return;
 
-    const env = selected.environments[this.state.selectedEnvIndex];
-
-    this.state.isRunning = true;
-    this.state.currentCommand = "dev";
-    this.state.output = [];
-    this.state.outputScrollOffset = 0;
+    const env = selected.environments[this.state.selectedEnvIndex] ?? "default";
+    this.processController.startDevServer(selected, env);
     this.render();
-
-    this.runningProcess = runWranglerDev({
-      configPath: selected.path,
-      environment: env,
-      onStdout: (data) => {
-        this.state.output.push(
-          ...data.split("\n").filter((line) => line.trim()),
-        );
-        this.render();
-      },
-      onStderr: (data) => {
-        this.state.output.push(
-          ...data.split("\n").filter((line) => line.trim()),
-        );
-        this.render();
-      },
-      onExit: (code) => {
-        this.state.isRunning = false;
-        this.state.output.push(`Process exited with code ${code}`);
-        this.runningProcess = null;
-        this.render();
-      },
-    });
-  }
-
-  private stopDevServer(): void {
-    if (this.runningProcess) {
-      stopProcess(this.runningProcess);
-      this.runningProcess = null;
-      this.state.isRunning = false;
-    }
   }
 
   private showDeployModal(): void {
@@ -427,97 +269,9 @@ export class LassoApp {
 
     this.closeModal();
 
-    this.state.isDeploying = true;
-    this.state.currentCommand = "deploy";
-    this.state.output = [];
-    this.state.outputScrollOffset = 0;
+    const env = selected.environments[this.state.selectedEnvIndex] ?? "default";
+    this.processController.startDeploy(selected, env, scope);
     this.render();
-
-    if (scope === "all") {
-      const { cancel } = runWranglerDeployAll({
-        configPath: selected.path,
-        environments: selected.environments,
-        onStdout: (data) => {
-          this.state.output.push(
-            ...data.split("\n").filter((line) => line.trim()),
-          );
-          this.render();
-        },
-        onStderr: (data) => {
-          this.state.output.push(
-            ...data.split("\n").filter((line) => line.trim()),
-          );
-          this.render();
-        },
-        onEnvironmentStart: (env) => {
-          this.state.output.push(`--- Deploying: ${env} ---`);
-          this.render();
-        },
-        onEnvironmentComplete: (env, code) => {
-          this.state.output.push(
-            `--- ${env}: ${code === 0 ? "success" : `failed (${code})`} ---`,
-          );
-          this.render();
-        },
-        onAllComplete: (results) => {
-          const failed = results.filter((r) => r.code !== 0);
-          this.state.isDeploying = false;
-          this.state.output.push(
-            failed.length === 0
-              ? `All ${results.length} environment(s) deployed successfully`
-              : `Deploy complete: ${results.length - failed.length}/${results.length} succeeded`,
-          );
-          this.deployCancel = null;
-          this.render();
-        },
-      });
-      this.deployCancel = cancel;
-    } else {
-      const env = selected.environments[this.state.selectedEnvIndex];
-      this.runningProcess = runWranglerDeploy({
-        configPath: selected.path,
-        environment: env,
-        onStdout: (data) => {
-          this.state.output.push(
-            ...data.split("\n").filter((line) => line.trim()),
-          );
-          this.render();
-        },
-        onStderr: (data) => {
-          this.state.output.push(
-            ...data.split("\n").filter((line) => line.trim()),
-          );
-          this.render();
-        },
-        onExit: (code) => {
-          this.state.isDeploying = false;
-          this.state.output.push(
-            code === 0
-              ? "Deploy completed successfully"
-              : `Deploy failed with code ${code}`,
-          );
-          this.runningProcess = null;
-          this.render();
-        },
-      });
-    }
-  }
-
-  private stopDeploy(): void {
-    if (this.deployCancel) {
-      this.deployCancel();
-      this.deployCancel = null;
-      this.state.isDeploying = false;
-      this.state.output.push("Deploy cancelled");
-      this.render();
-    }
-    if (this.runningProcess && this.state.isDeploying) {
-      stopProcess(this.runningProcess);
-      this.runningProcess = null;
-      this.state.isDeploying = false;
-      this.state.output.push("Deploy cancelled");
-      this.render();
-    }
   }
 
   private closeModal(): void {
@@ -539,9 +293,58 @@ export class LassoApp {
     }
   }
 
+  private scheduleRender(): void {
+    if (this.renderScheduled) return;
+    this.renderScheduled = true;
+
+    setImmediate(() => {
+      this.renderScheduled = false;
+      this.render();
+    });
+  }
+
+  private scrollToSelection(
+    panel: "configs" | "environments",
+    index: number,
+  ): void {
+    if (!this.renderer) return;
+
+    // Defer to next tick to ensure the ScrollBox has been rendered
+    setImmediate(() => {
+      const scrollBoxId =
+        panel === "configs" ? "configs-scrollbox" : "environments-scrollbox";
+      const scrollBox = this.renderer?.root.findDescendantById(scrollBoxId);
+
+      if (scrollBox && scrollBox instanceof ScrollBoxRenderable) {
+        // Each item is approximately 1 line height
+        const itemHeight = 1;
+        const targetY = index * itemHeight;
+        scrollBox.scrollTo({ x: 0, y: targetY });
+      }
+    });
+  }
+
+  private scrollOutput(delta: number): void {
+    if (!this.renderer) return;
+
+    const scrollBox = this.renderer.root.findDescendantById("output-scrollbox");
+
+    if (scrollBox && scrollBox instanceof ScrollBoxRenderable) {
+      if (delta === Infinity) {
+        // Jump to bottom
+        scrollBox.scrollTo({ x: 0, y: scrollBox.scrollHeight });
+      } else if (delta === -Infinity) {
+        // Jump to top
+        scrollBox.scrollTo({ x: 0, y: 0 });
+      } else {
+        // Scroll by delta lines
+        scrollBox.scrollBy({ x: 0, y: delta });
+      }
+    }
+  }
+
   private cleanup(): void {
-    this.stopDeploy();
-    this.stopDevServer();
+    this.processController.stopAll();
     this.watcher?.close();
     this.renderer?.destroy();
     process.exit(0);

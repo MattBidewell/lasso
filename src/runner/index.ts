@@ -5,3 +5,4 @@ export {
   type RunDeployOptions,
   type RunDeployAllOptions,
 } from './deploy.ts';
+export { ProcessController, type ProcessControllerCallbacks } from './controller.ts';

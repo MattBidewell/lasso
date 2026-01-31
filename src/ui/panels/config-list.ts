@@ -1,22 +1,31 @@
-import { Box, Text, vstyles } from "@opentui/core";
+import { ScrollBox, Box, Text, vstyles } from "@opentui/core";
 import type { AppState } from "../../types/app.ts";
 import { COLORS } from "../../themes/index.ts";
 
-export function renderConfigListPanel(state: AppState) {
+export interface ConfigListPanelProps {
+  state: AppState;
+}
+
+export function renderConfigListPanel({ state }: ConfigListPanelProps) {
   const isFocused = state.focusedPanel === 'configs';
 
-  return Box(
+  return ScrollBox(
     {
-      width: 25,
-      flexDirection: "column",
-      border: true,
-      borderStyle: "rounded",
-      borderColor: isFocused ? COLORS.selected : COLORS.border,
-      padding: 1,
-      title: " Configs ",
-      titleAlignment: "left",
+      id: "configs-scrollbox",
+      flexGrow: 1,
+      scrollY: true,
+      scrollX: false,
+      viewportCulling: true,
+      rootOptions: {
+        border: true,
+        borderStyle: "rounded",
+        borderColor: isFocused ? COLORS.activeBorder : COLORS.inactiveBorder,
+        padding: 1,
+        title: " Configs ",
+        titleAlignment: "left",
+      },
     },
-    // Config list
+    // Config list - render all items, ScrollBox handles viewport
     ...state.configs.map((config, index) => {
       const isSelected = index === state.selectedConfigIndex;
       const prefix = isSelected ? ">" : " ";
@@ -25,6 +34,7 @@ export function renderConfigListPanel(state: AppState) {
 
       return Box(
         {
+          id: `config-item-${index}`,
           backgroundColor:
             isSelected && isFocused ? COLORS.selectedBg : undefined,
         },
