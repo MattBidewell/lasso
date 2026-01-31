@@ -1,15 +1,20 @@
 import { Box, Text, vstyles } from "@opentui/core";
 import type { AppState } from "../../types/app.ts";
+import type { Panel } from "../panels/types.ts";
 import { COLORS } from "../../themes/index.ts";
-import { renderConfigListPanel } from "../panels/config-list.ts";
-import { renderEnvironmentsPanel } from "../panels/environments.ts";
 import { renderBindingsPanel } from "../panels/bindings.ts";
 import { renderAboutPanel } from "../panels/about.ts";
-import { renderOutputPanel } from "../panels/output.ts";
 import { renderDeployConfirmModal } from "../modals/index.ts";
 
-export function renderMainScreen(state: AppState) {
-  const showOutput = state.isRunning || state.isDeploying || state.output.length > 0;
+export interface MainScreenPanels {
+  configs: Panel;
+  environments: Panel;
+  output: Panel;
+}
+
+export function renderMainScreen(state: AppState, panels: MainScreenPanels) {
+  const showOutput =
+    state.isRunning || state.isDeploying || state.output.length > 0;
 
   return Box(
     {
@@ -30,10 +35,10 @@ export function renderMainScreen(state: AppState) {
           flexDirection: "column",
           gap: 0,
         },
-        // Configs panel (ScrollBox handles its own viewport)
-        renderConfigListPanel({ state }),
-        // Environments panel (ScrollBox handles its own viewport)
-        renderEnvironmentsPanel({ state }),
+        // Configs panel
+        panels.configs.render(state) as ReturnType<typeof renderBindingsPanel>,
+        // Environments panel
+        panels.environments.render(state) as ReturnType<typeof renderBindingsPanel>,
         // Bindings panel (display-only, compact)
         renderBindingsPanel(state),
       ),
@@ -44,44 +49,73 @@ export function renderMainScreen(state: AppState) {
           flexDirection: "column",
         },
         showOutput
-          ? renderOutputPanel(state)
+          ? (panels.output.render(state) as ReturnType<typeof renderAboutPanel>)
           : renderAboutPanel(),
       ),
     ),
     // Status bar
     renderStatusBar(state),
     // Modal overlay
-    ...(state.modal?.type === 'deploy-confirm'
+    ...(state.modal?.type === "deploy-confirm"
       ? [renderDeployConfirmModal(state.modal)]
       : []),
   );
 }
 
 function renderStatusBar(state: AppState) {
-  const helpText = getContextualHelp(state);
+  const shortcuts = getContextualShortcuts(state);
 
   return Box(
     {
-      paddingTop: 1,
+      height: 2,
+      flexShrink: 0,
       flexDirection: "row",
       justifyContent: "space-between",
+      alignItems: "flex-end",
     },
-    Text({}, vstyles.dim(helpText)),
+    Box(
+      { flexDirection: "row", gap: 2 },
+      ...shortcuts.map(([key, action]) =>
+        Text(
+          {},
+          vstyles.color(COLORS.accent, key),
+          vstyles.dim(` ${action}`),
+        ),
+      ),
+    ),
     ...(state.statusMessage
       ? [Text({}, vstyles.color(COLORS.success, state.statusMessage))]
       : []),
   );
 }
 
-function getContextualHelp(state: AppState): string {
+type Shortcut = [key: string, action: string];
+
+function getContextualShortcuts(state: AppState): Shortcut[] {
+  const common: Shortcut[] = [
+    ["Tab", "focus"],
+    ["q", "quit"],
+  ];
+
   switch (state.focusedPanel) {
-    case 'configs':
-      return "j/k navigate  Enter select  r refresh  Tab focus  q quit";
-    case 'environments':
-      return "j/k navigate  Enter run  ^D deploy  Tab focus  b back  q quit";
-    case 'output':
-      return "j/k scroll  ^U/^D page  Tab focus  b back  q quit";
+    case "configs":
+      return [
+        ["j/k", "navigate"],
+        ["Enter", "select"],
+        ["r", "refresh"],
+        ...common,
+      ];
+    case "environments":
+      return [
+        ["j/k", "navigate"],
+        ["Enter", "run"],
+        ["^D", "deploy"],
+        ["b", "back"],
+        ...common,
+      ];
+    case "output":
+      return [["j/k", "scroll"], ["g/G", "top/bottom"], ["b", "back"], ...common];
     default:
-      return "j/k navigate  Tab focus  q quit";
+      return [["j/k", "navigate"], ...common];
   }
 }

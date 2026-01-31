@@ -10,18 +10,17 @@ import {
   watchWranglerConfigs,
 } from "./discovery/index.ts";
 import { ProcessController } from "./runner/index.ts";
-import { InputHandler } from "./input/index.ts";
+import { InputRouter } from "./input/index.ts";
 import {
   type AppState,
   type DeployScope,
   createInitialState,
 } from "./types/app.ts";
-import {
-  parseKeyEvent,
-  isCtrlC,
-  isCtrlD,
-  renderMainScreen,
-} from "./ui/index.ts";
+import { parseKeyEvent, isCtrlC, isCtrlD } from "./ui/input.ts";
+import { renderMainScreen, type MainScreenPanels } from "./ui/screens/main.ts";
+import { ConfigsPanel } from "./ui/panels/config-list.ts";
+import { EnvironmentsPanel } from "./ui/panels/environments.ts";
+import { OutputPanel } from "./ui/panels/output.ts";
 
 export class LassoApp {
   private renderer: CliRenderer | null = null;
@@ -30,7 +29,8 @@ export class LassoApp {
   private watchEnabled: boolean;
   private renderScheduled = false;
   private processController: ProcessController;
-  private inputHandler: InputHandler;
+  private inputRouter: InputRouter;
+  private panels: MainScreenPanels;
 
   constructor(cwd: string, watchEnabled: boolean) {
     this.state = createInitialState(cwd);
@@ -62,8 +62,25 @@ export class LassoApp {
       onRender: () => this.render(),
     });
 
-    // Initialize input handler
-    this.inputHandler = new InputHandler(
+    // Initialize panels with their callbacks
+    this.panels = {
+      configs: new ConfigsPanel({
+        onRefresh: () => this.refresh(),
+        onScrollToSelection: (index) =>
+          this.scrollToSelection("configs", index),
+      }),
+      environments: new EnvironmentsPanel({
+        onStartDev: () => this.startDevServer(),
+        onScrollToSelection: (index) =>
+          this.scrollToSelection("environments", index),
+      }),
+      output: new OutputPanel({
+        onScrollOutput: (delta) => this.scrollOutput(delta),
+      }),
+    };
+
+    // Initialize input router
+    this.inputRouter = new InputRouter(
       () => this.state,
       (updates) => Object.assign(this.state, updates),
       {
@@ -71,18 +88,17 @@ export class LassoApp {
           this.processController.stopAll();
           this.cleanup();
         },
-        onRefresh: () => this.refresh(),
-        onStartDev: () => this.startDevServer(),
         onShowDeployModal: () => this.showDeployModal(),
         onCloseModal: () => this.closeModal(),
         onStartDeploy: (scope) => this.startDeploy(scope),
         onStateChange: () => this.scheduleRender(),
-        onRender: () => this.render(),
-        onScrollToSelection: (panel, index) =>
-          this.scrollToSelection(panel, index),
-        onScrollOutput: (delta) => this.scrollOutput(delta),
       },
     );
+
+    // Register panels with the router
+    this.inputRouter.registerPanel(this.panels.configs);
+    this.inputRouter.registerPanel(this.panels.environments);
+    this.inputRouter.registerPanel(this.panels.output);
   }
 
   async start(): Promise<void> {
@@ -137,7 +153,7 @@ export class LassoApp {
 
       const key = parseKeyEvent(event);
       if (key) {
-        this.inputHandler.handleKeyPress(key);
+        this.inputRouter.handleKeyPress(key);
       }
     });
 
@@ -287,7 +303,7 @@ export class LassoApp {
       this.renderer.root.remove(child.id);
     }
 
-    const content = renderMainScreen(this.state);
+    const content = renderMainScreen(this.state, this.panels);
     if (content) {
       this.renderer.root.add(content);
     }

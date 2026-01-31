@@ -1,1 +1,1 @@
-export { renderMainScreen } from "./main.ts";
+export { renderMainScreen, type MainScreenPanels } from "./main.ts";
