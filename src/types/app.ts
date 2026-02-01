@@ -25,10 +25,10 @@ export interface DeployModalState {
   environments: string[];
 }
 
-// Generic options modal state (reusable for tail, and future commands)
+// Generic options modal state
 export interface OptionsModalState {
-  type: 'options';
-  commandType: 'tail' | string;
+  type: "options";
+  commandType: "tail" | "deploy" | string;
   title: string;
   workerName: string;
   environment: string;
@@ -50,6 +50,17 @@ export interface TailOptions {
   ip?: string[];
   header?: string;
   versionId?: string;
+}
+
+// Deploy-specific options (extracted from modal values)
+export interface DeployOptions {
+  dryRun?: boolean;
+  minify?: boolean;
+  keepVars?: boolean;
+  noBundle?: boolean;
+  uploadSourceMaps?: boolean;
+  compatibilityDate?: string;
+  name?: string;
 }
 
 export interface DiscoveredConfig {
