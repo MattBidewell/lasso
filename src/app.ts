@@ -13,8 +13,8 @@ import { ProcessController } from "./runner/index.ts";
 import { InputRouter } from "./input/index.ts";
 import {
   type AppState,
-  type DeployScope,
   type TailOptions,
+  type DeployOptions,
   createInitialState,
 } from "./types/app.ts";
 import { parseKeyEvent, isCtrlC, isCtrlD } from "./ui/input.ts";
@@ -24,6 +24,7 @@ import { EnvironmentsPanel } from "./ui/panels/environments.ts";
 import { OutputPanel } from "./ui/panels/output.ts";
 import { LogsPanel } from "./ui/panels/logs.ts";
 import { createTailModalState } from "./ui/modals/tail-options.ts";
+import { createDeployModalState } from "./ui/modals/deploy-options.ts";
 
 export class LassoApp {
   private renderer: CliRenderer | null = null;
@@ -112,7 +113,7 @@ export class LassoApp {
         onShowDeployModal: () => this.showDeployModal(),
         onShowTailModal: () => this.showTailModal(),
         onCloseModal: () => this.closeModal(),
-        onStartDeploy: (scope) => this.startDeploy(scope),
+        onStartDeploy: (deployOptions) => this.startDeploy(deployOptions),
         onStartTail: (options) => this.startTail(options),
         onStateChange: () => this.scheduleRender(),
       },
@@ -304,23 +305,18 @@ export class LassoApp {
     if (this.state.focusedPanel !== "environments") return;
 
     const env = selected.environments[this.state.selectedEnvIndex] ?? "default";
-    this.state.modal = {
-      type: "deploy-confirm",
-      workerName: selected.name,
-      environment: env,
-      environments: selected.environments,
-    };
+    this.state.modal = createDeployModalState(selected.name, env);
     this.render();
   }
 
-  private startDeploy(scope: DeployScope): void {
+  private startDeploy(deployOptions?: DeployOptions): void {
     const selected = this.state.configs[this.state.selectedConfigIndex];
     if (!selected?.config) return;
 
     this.closeModal();
 
     const env = selected.environments[this.state.selectedEnvIndex] ?? "default";
-    this.processController.startDeploy(selected, env, scope);
+    this.processController.startDeploy(selected, env, deployOptions);
     this.render();
   }
 

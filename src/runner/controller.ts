@@ -1,6 +1,6 @@
 import type { ChildProcess } from "node:child_process";
-import type { DiscoveredConfig, DeployScope, TailOptions } from "../types/app.ts";
-import { runWranglerDev, runWranglerDeploy, runWranglerDeployAll, runWranglerTail, stopProcess } from "./index.ts";
+import type { DiscoveredConfig, TailOptions, DeployOptions } from "../types/app.ts";
+import { runWranglerDev, runWranglerDeploy, runWranglerTail, stopProcess } from "./index.ts";
 
 /**
  * Callbacks for process lifecycle events
@@ -22,7 +22,6 @@ export interface ProcessControllerCallbacks {
  */
 export class ProcessController {
   private runningProcess: ChildProcess | null = null;
-  private deployCancel: (() => void) | null = null;
   private tailProcess: ChildProcess | null = null;
   private _isRunning = false;
   private _isDeploying = false;
@@ -84,88 +83,44 @@ export class ProcessController {
   }
 
   /**
-   * Start a deploy for selected environment or all environments
+   * Start a deploy for the selected environment
    */
-  startDeploy(config: DiscoveredConfig, env: string, scope: DeployScope): void {
+  startDeploy(config: DiscoveredConfig, env: string, deployOptions?: DeployOptions): void {
     if (!config.config) return;
 
     this._isDeploying = true;
     this.callbacks.onDeployStart();
 
-    if (scope === "all") {
-      const { cancel } = runWranglerDeployAll({
-        configPath: config.path,
-        environments: config.environments,
-        onStdout: (data) => {
-          this.pushOutputLines(data);
-          this.callbacks.onRender();
-        },
-        onStderr: (data) => {
-          this.pushOutputLines(data);
-          this.callbacks.onRender();
-        },
-        onEnvironmentStart: (envName) => {
-          this.callbacks.onOutputLine(`--- Deploying: ${envName} ---`);
-          this.callbacks.onRender();
-        },
-        onEnvironmentComplete: (envName, code) => {
-          this.callbacks.onOutputLine(
-            `--- ${envName}: ${code === 0 ? "success" : `failed (${code})`} ---`,
-          );
-          this.callbacks.onRender();
-        },
-        onAllComplete: (results) => {
-          const failed = results.filter((r) => r.code !== 0);
-          this._isDeploying = false;
-          this.callbacks.onOutputLine(
-            failed.length === 0
-              ? `All ${results.length} environment(s) deployed successfully`
-              : `Deploy complete: ${results.length - failed.length}/${results.length} succeeded`,
-          );
-          this.deployCancel = null;
-          this.callbacks.onDeployEnd();
-          this.callbacks.onRender();
-        },
-      });
-      this.deployCancel = cancel;
-    } else {
-      this.runningProcess = runWranglerDeploy({
-        configPath: config.path,
-        environment: env,
-        onStdout: (data) => {
-          this.pushOutputLines(data);
-          this.callbacks.onRender();
-        },
-        onStderr: (data) => {
-          this.pushOutputLines(data);
-          this.callbacks.onRender();
-        },
-        onExit: (code) => {
-          this._isDeploying = false;
-          this.callbacks.onOutputLine(
-            code === 0
-              ? "Deploy completed successfully"
-              : `Deploy failed with code ${code}`,
-          );
-          this.runningProcess = null;
-          this.callbacks.onDeployEnd();
-          this.callbacks.onRender();
-        },
-      });
-    }
+    this.runningProcess = runWranglerDeploy({
+      configPath: config.path,
+      environment: env,
+      deployOptions,
+      onStdout: (data) => {
+        this.pushOutputLines(data);
+        this.callbacks.onRender();
+      },
+      onStderr: (data) => {
+        this.pushOutputLines(data);
+        this.callbacks.onRender();
+      },
+      onExit: (code) => {
+        this._isDeploying = false;
+        this.callbacks.onOutputLine(
+          code === 0
+            ? "Deploy completed successfully"
+            : `Deploy failed with code ${code}`,
+        );
+        this.runningProcess = null;
+        this.callbacks.onDeployEnd();
+        this.callbacks.onRender();
+      },
+    });
   }
 
   /**
    * Stop any running deploy
    */
   stopDeploy(): void {
-    if (this.deployCancel) {
-      this.deployCancel();
-      this.deployCancel = null;
-      this._isDeploying = false;
-      this.callbacks.onOutputLine("Deploy cancelled");
-      this.callbacks.onRender();
-    }
     if (this.runningProcess && this._isDeploying) {
       stopProcess(this.runningProcess);
       this.runningProcess = null;

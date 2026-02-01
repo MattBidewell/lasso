@@ -1,4 +1,4 @@
-import type { AppState, DeployScope, TailOptions, OptionsModalState } from "../types/app.ts";
+import type { AppState, TailOptions, DeployOptions, OptionsModalState } from "../types/app.ts";
 import type { KeyName } from "../ui/input.ts";
 import type { Panel } from "../ui/panels/types.ts";
 import { getNextFocusedPanel } from "../state/index.ts";
@@ -11,7 +11,7 @@ export interface InputRouterCallbacks {
   onShowDeployModal: () => void;
   onShowTailModal: () => void;
   onCloseModal: () => void;
-  onStartDeploy: (scope: DeployScope) => void;
+  onStartDeploy: (deployOptions?: DeployOptions) => void;
   onStartTail: (options: TailOptions) => void;
   onStateChange: () => void;
 }
@@ -76,25 +76,8 @@ export class InputRouter {
     const modal = state.modal;
     if (!modal) return;
 
-    if (modal.type === "deploy-confirm") {
-      this.handleDeployModalKeyPress(key);
-    } else if (modal.type === "options") {
+    if (modal.type === "options") {
       this.handleOptionsModalKeyPress(key, modal);
-    }
-  }
-
-  private handleDeployModalKeyPress(key: KeyName): void {
-    switch (key) {
-      case "y":
-        this.callbacks.onStartDeploy("selected");
-        break;
-      case "a":
-        this.callbacks.onStartDeploy("all");
-        break;
-      case "n":
-      case "escape":
-        this.callbacks.onCloseModal();
-        break;
     }
   }
 
@@ -124,6 +107,10 @@ export class InputRouter {
           const { extractTailOptions } = require("../ui/modals/tail-options.ts");
           const options = extractTailOptions(modal.values);
           this.callbacks.onStartTail(options);
+        } else if (modal.commandType === "deploy") {
+          const { extractDeployOptions } = require("../ui/modals/deploy-options.ts");
+          const options = extractDeployOptions(modal.values);
+          this.callbacks.onStartDeploy(options);
         }
         return;
       }
@@ -167,6 +154,10 @@ export class InputRouter {
           const { extractTailOptions } = require("../ui/modals/tail-options.ts");
           const options = extractTailOptions(modal.values);
           this.callbacks.onStartTail(options);
+        } else if (modal.commandType === "deploy") {
+          const { extractDeployOptions } = require("../ui/modals/deploy-options.ts");
+          const options = extractDeployOptions(modal.values);
+          this.callbacks.onStartDeploy(options);
         }
         break;
 

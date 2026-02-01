@@ -1,7 +1,6 @@
 import type { WranglerConfig } from './wrangler.ts';
 
 export type ModalType = 'deploy-confirm' | 'options' | null;
-export type DeployScope = 'selected' | 'all';
 export type CommandType = 'dev' | 'deploy' | 'tail' | null;
 
 // Generic modal field configuration (reusable for any options modal)

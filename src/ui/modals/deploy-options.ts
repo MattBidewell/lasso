@@ -63,7 +63,6 @@ export const DEPLOY_FIELDS: FieldConfig[] = [
 export function createDeployModalState(
   workerName: string,
   environment: string,
-  environments: string[],
 ): OptionsModalState {
   return {
     type: "options",
@@ -78,7 +77,6 @@ export function createDeployModalState(
       keepVars: "false",
       noBundle: "false",
       uploadSourceMaps: "false",
-      environments, // Store for "deploy all" option
     },
     focusedField: 0,
     confirmLabel: "Deploy",
