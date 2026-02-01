@@ -5,4 +5,5 @@ export {
   type RunDeployOptions,
   type RunDeployAllOptions,
 } from './deploy.ts';
+export { runWranglerTail, type RunTailOptions } from './tail.ts';
 export { ProcessController, type ProcessControllerCallbacks } from './controller.ts';

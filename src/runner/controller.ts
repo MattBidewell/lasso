@@ -1,6 +1,6 @@
 import type { ChildProcess } from "node:child_process";
-import type { DiscoveredConfig, DeployScope } from "../types/app.ts";
-import { runWranglerDev, runWranglerDeploy, runWranglerDeployAll, stopProcess } from "./index.ts";
+import type { DiscoveredConfig, DeployScope, TailOptions } from "../types/app.ts";
+import { runWranglerDev, runWranglerDeploy, runWranglerDeployAll, runWranglerTail, stopProcess } from "./index.ts";
 
 /**
  * Callbacks for process lifecycle events
@@ -11,6 +11,9 @@ export interface ProcessControllerCallbacks {
   onDevEnd: (code: number | null) => void;
   onDeployStart: () => void;
   onDeployEnd: () => void;
+  onTailStart: () => void;
+  onTailEnd: (code: number | null) => void;
+  onTailOutputLine: (line: string) => void;
   onRender: () => void;
 }
 
@@ -20,8 +23,10 @@ export interface ProcessControllerCallbacks {
 export class ProcessController {
   private runningProcess: ChildProcess | null = null;
   private deployCancel: (() => void) | null = null;
+  private tailProcess: ChildProcess | null = null;
   private _isRunning = false;
   private _isDeploying = false;
+  private _isTailing = false;
 
   constructor(private callbacks: ProcessControllerCallbacks) {}
 
@@ -31,6 +36,10 @@ export class ProcessController {
 
   get isDeploying(): boolean {
     return this._isDeploying;
+  }
+
+  get isTailing(): boolean {
+    return this._isTailing;
   }
 
   /**
@@ -167,11 +176,67 @@ export class ProcessController {
   }
 
   /**
+   * Start tailing logs for a config/environment
+   */
+  startTail(config: DiscoveredConfig, env: string, options: TailOptions): void {
+    if (!config.config) return;
+
+    // Stop any existing tail
+    this.stopTail();
+
+    this._isTailing = true;
+    this.callbacks.onTailStart();
+
+    this.tailProcess = runWranglerTail({
+      configPath: config.path,
+      workerName: config.name,
+      environment: env,
+      tailOptions: options,
+      onStdout: (data) => {
+        this.pushTailOutputLines(data);
+        this.callbacks.onRender();
+      },
+      onStderr: (data) => {
+        this.pushTailOutputLines(data);
+        this.callbacks.onRender();
+      },
+      onExit: (code) => {
+        this._isTailing = false;
+        this.callbacks.onTailOutputLine(`Tail ended with code ${code}`);
+        this.tailProcess = null;
+        this.callbacks.onTailEnd(code);
+        this.callbacks.onRender();
+      },
+    });
+  }
+
+  /**
+   * Stop any running tail
+   */
+  stopTail(): void {
+    if (this.tailProcess) {
+      stopProcess(this.tailProcess);
+      this.tailProcess = null;
+      this._isTailing = false;
+      this.callbacks.onTailOutputLine("Tail stopped");
+      this.callbacks.onRender();
+    }
+  }
+
+  /**
    * Stop all running processes
    */
   stopAll(): void {
     this.stopDeploy();
     this.stopDevServer();
+    this.stopTail();
+  }
+
+  private pushTailOutputLines(data: string): void {
+    const lines = data.split('\n').filter((line) => line.trim());
+    for (const line of lines) {
+      this.callbacks.onTailOutputLine(line);
+    }
   }
 
   private pushOutputLines(data: string): void {

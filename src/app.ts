@@ -14,6 +14,7 @@ import { InputRouter } from "./input/index.ts";
 import {
   type AppState,
   type DeployScope,
+  type TailOptions,
   createInitialState,
 } from "./types/app.ts";
 import { parseKeyEvent, isCtrlC, isCtrlD } from "./ui/input.ts";
@@ -21,6 +22,8 @@ import { renderMainScreen, type MainScreenPanels } from "./ui/screens/main.ts";
 import { ConfigsPanel } from "./ui/panels/config-list.ts";
 import { EnvironmentsPanel } from "./ui/panels/environments.ts";
 import { OutputPanel } from "./ui/panels/output.ts";
+import { LogsPanel } from "./ui/panels/logs.ts";
+import { createTailModalState } from "./ui/modals/tail-options.ts";
 
 export class LassoApp {
   private renderer: CliRenderer | null = null;
@@ -59,6 +62,21 @@ export class LassoApp {
       onDeployEnd: () => {
         this.state.isDeploying = false;
       },
+      onTailStart: () => {
+        this.state.isTailing = true;
+        this.state.currentCommand = "tail";
+        this.state.tailOutput = [];
+      },
+      onTailEnd: () => {
+        this.state.isTailing = false;
+      },
+      onTailOutputLine: (line) => {
+        this.state.tailOutput.push(line);
+        // Keep tail output limited to 500 lines
+        if (this.state.tailOutput.length > 500) {
+          this.state.tailOutput = this.state.tailOutput.slice(-500);
+        }
+      },
       onRender: () => this.render(),
     });
 
@@ -77,6 +95,9 @@ export class LassoApp {
       output: new OutputPanel({
         onScrollOutput: (delta) => this.scrollOutput(delta),
       }),
+      logs: new LogsPanel({
+        onScrollLogs: (delta) => this.scrollLogs(delta),
+      }),
     };
 
     // Initialize input router
@@ -89,8 +110,10 @@ export class LassoApp {
           this.cleanup();
         },
         onShowDeployModal: () => this.showDeployModal(),
+        onShowTailModal: () => this.showTailModal(),
         onCloseModal: () => this.closeModal(),
         onStartDeploy: (scope) => this.startDeploy(scope),
+        onStartTail: (options) => this.startTail(options),
         onStateChange: () => this.scheduleRender(),
       },
     );
@@ -99,6 +122,7 @@ export class LassoApp {
     this.inputRouter.registerPanel(this.panels.configs);
     this.inputRouter.registerPanel(this.panels.environments);
     this.inputRouter.registerPanel(this.panels.output);
+    this.inputRouter.registerPanel(this.panels.logs);
   }
 
   async start(): Promise<void> {
@@ -128,6 +152,11 @@ export class LassoApp {
 
     this.renderer.keyInput.on("keypress", (event) => {
       if (isCtrlC(event)) {
+        // Stop tail if logs panel is focused and tailing
+        if (this.state.isTailing && this.state.focusedPanel === "logs") {
+          this.processController.stopTail();
+          return;
+        }
         if (this.state.isDeploying) {
           this.processController.stopDeploy();
           return;
@@ -153,6 +182,11 @@ export class LassoApp {
 
       const key = parseKeyEvent(event);
       if (key) {
+        // Handle 't' key for tail modal from environments panel
+        if (key === "t" && this.state.focusedPanel === "environments" && !this.state.modal) {
+          this.showTailModal();
+          return;
+        }
         this.inputRouter.handleKeyPress(key);
       }
     });
@@ -295,6 +329,29 @@ export class LassoApp {
     this.render();
   }
 
+  private showTailModal(): void {
+    const selected = this.state.configs[this.state.selectedConfigIndex];
+    if (!selected?.config) return;
+
+    // Only allow tail from environments panel
+    if (this.state.focusedPanel !== "environments") return;
+
+    const env = selected.environments[this.state.selectedEnvIndex] ?? "default";
+    this.state.modal = createTailModalState(selected.name, env);
+    this.render();
+  }
+
+  private startTail(options: TailOptions): void {
+    const selected = this.state.configs[this.state.selectedConfigIndex];
+    if (!selected?.config) return;
+
+    this.closeModal();
+
+    const env = selected.environments[this.state.selectedEnvIndex] ?? "default";
+    this.processController.startTail(selected, env, options);
+    this.render();
+  }
+
   private render(): void {
     if (!this.renderer) return;
 
@@ -344,6 +401,25 @@ export class LassoApp {
     if (!this.renderer) return;
 
     const scrollBox = this.renderer.root.findDescendantById("output-scrollbox");
+
+    if (scrollBox && scrollBox instanceof ScrollBoxRenderable) {
+      if (delta === Infinity) {
+        // Jump to bottom
+        scrollBox.scrollTo({ x: 0, y: scrollBox.scrollHeight });
+      } else if (delta === -Infinity) {
+        // Jump to top
+        scrollBox.scrollTo({ x: 0, y: 0 });
+      } else {
+        // Scroll by delta lines
+        scrollBox.scrollBy({ x: 0, y: delta });
+      }
+    }
+  }
+
+  private scrollLogs(delta: number): void {
+    if (!this.renderer) return;
+
+    const scrollBox = this.renderer.root.findDescendantById("logs-scrollbox");
 
     if (scrollBox && scrollBox instanceof ScrollBoxRenderable) {
       if (delta === Infinity) {

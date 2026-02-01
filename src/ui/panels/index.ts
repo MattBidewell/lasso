@@ -8,6 +8,7 @@ export {
   type EnvironmentsPanelCallbacks,
 } from "./environments.ts";
 export { OutputPanel, type OutputPanelCallbacks } from "./output.ts";
+export { LogsPanel, type LogsPanelCallbacks } from "./logs.ts";
 
 // Static render functions (non-interactive panels)
 export { renderBindingsPanel } from "./bindings.ts";

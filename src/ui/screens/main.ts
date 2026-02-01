@@ -4,17 +4,79 @@ import type { Panel } from "../panels/types.ts";
 import { COLORS } from "../../themes/index.ts";
 import { renderBindingsPanel } from "../panels/bindings.ts";
 import { renderAboutPanel } from "../panels/about.ts";
-import { renderDeployConfirmModal } from "../modals/index.ts";
+import { renderDeployConfirmModal, renderOptionsModal } from "../modals/index.ts";
 
 export interface MainScreenPanels {
   configs: Panel;
   environments: Panel;
   output: Panel;
+  logs: Panel;
 }
 
 export function renderMainScreen(state: AppState, panels: MainScreenPanels) {
   const showOutput =
     state.isRunning || state.isDeploying || state.output.length > 0;
+  const showLogs = state.isTailing || state.tailOutput.length > 0;
+
+  // Determine what to show in right column
+  const renderRightColumn = () => {
+    if (showOutput && showLogs) {
+      // Both active - stack vertically (50/50)
+      return Box(
+        {
+          width: "67%",
+          flexDirection: "column",
+          gap: 0,
+        },
+        Box(
+          { height: "50%", flexDirection: "column" },
+          panels.output.render(state) as ReturnType<typeof renderAboutPanel>,
+        ),
+        Box(
+          { height: "50%", flexDirection: "column" },
+          panels.logs.render(state) as ReturnType<typeof renderAboutPanel>,
+        ),
+      );
+    } else if (showOutput) {
+      // Only output
+      return Box(
+        {
+          width: "67%",
+          flexDirection: "column",
+        },
+        panels.output.render(state) as ReturnType<typeof renderAboutPanel>,
+      );
+    } else if (showLogs) {
+      // Only logs
+      return Box(
+        {
+          width: "67%",
+          flexDirection: "column",
+        },
+        panels.logs.render(state) as ReturnType<typeof renderAboutPanel>,
+      );
+    } else {
+      // Neither - show about
+      return Box(
+        {
+          width: "67%",
+          flexDirection: "column",
+        },
+        renderAboutPanel(),
+      );
+    }
+  };
+
+  // Determine which modal to render
+  const renderModal = () => {
+    if (!state.modal) return [];
+    if (state.modal.type === "deploy-confirm") {
+      return [renderDeployConfirmModal(state.modal)];
+    } else if (state.modal.type === "options") {
+      return [renderOptionsModal(state.modal)];
+    }
+    return [];
+  };
 
   return Box(
     {
@@ -42,23 +104,13 @@ export function renderMainScreen(state: AppState, panels: MainScreenPanels) {
         // Bindings panel (display-only, compact)
         renderBindingsPanel(state),
       ),
-      // Right column (67%) - About OR Output
-      Box(
-        {
-          width: "67%",
-          flexDirection: "column",
-        },
-        showOutput
-          ? (panels.output.render(state) as ReturnType<typeof renderAboutPanel>)
-          : renderAboutPanel(),
-      ),
+      // Right column (67%) - Output, Logs, or About
+      renderRightColumn(),
     ),
     // Status bar
     renderStatusBar(state),
     // Modal overlay
-    ...(state.modal?.type === "deploy-confirm"
-      ? [renderDeployConfirmModal(state.modal)]
-      : []),
+    ...renderModal(),
   );
 }
 
@@ -110,11 +162,14 @@ function getContextualShortcuts(state: AppState): Shortcut[] {
         ["j/k", "navigate"],
         ["Enter", "run"],
         ["^D", "deploy"],
+        ["t", "tail"],
         ["b", "back"],
         ...common,
       ];
     case "output":
       return [["j/k", "scroll"], ["g/G", "top/bottom"], ["b", "back"], ...common];
+    case "logs":
+      return [["j/k", "scroll"], ["g/G", "top/bottom"], ["^C", "stop"], ["b", "back"], ...common];
     default:
       return [["j/k", "navigate"], ...common];
   }

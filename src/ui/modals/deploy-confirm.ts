@@ -1,8 +1,8 @@
 import { Box, Text, vstyles } from "@opentui/core";
-import type { ModalState } from "../../types/app.ts";
+import type { DeployModalState } from "../../types/app.ts";
 import { COLORS } from "../../themes/index.ts";
 
-export function renderDeployConfirmModal(modal: ModalState) {
+export function renderDeployConfirmModal(modal: DeployModalState) {
   const hasMultipleEnvs = modal.environments.length > 1;
 
   return Box(

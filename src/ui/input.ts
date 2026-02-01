@@ -14,6 +14,8 @@ export type KeyName =
   | "escape"
   | "tab"
   | "shift-tab"
+  | "space"
+  | "backspace"
   | "j"
   | "k"
   | "l"
@@ -27,8 +29,12 @@ export type KeyName =
   | "g"
   | "G"
   | "o"
+  | "t"
+  | "+"
+  | "-"
   | "ctrl-u"
   | "ctrl-d"
+  | "char"  // Generic character input
   | "?";
 
 export function parseKeyEvent(event: KeyEvent): KeyName | null {
@@ -57,8 +63,18 @@ export function parseKeyEvent(event: KeyEvent): KeyName | null {
   // Escape
   if (event.name === "escape") return "escape";
 
+  // Space
+  if (event.name === "space" || event.sequence === " ") return "space";
+
+  // Backspace
+  if (event.name === "backspace") return "backspace";
+
   // Handle uppercase G separately (shift detection via sequence)
   if (event.sequence === "G") return "G";
+
+  // Plus and minus keys
+  if (event.sequence === "+" || event.name === "+") return "+";
+  if (event.sequence === "-" || event.name === "-") return "-";
 
   // Single character keys
   if (event.name && event.name.length === 1) {
