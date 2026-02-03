@@ -8,10 +8,6 @@ export function ConfigsPanel() {
   const configs = createMemo(() => getFilteredConfigs());
   const selectedIndex = () => state.selectedConfigIndex;
 
-  // Check if a config has a running process
-  const isRunning = (configPath: string) => state.runningConfigPath === configPath;
-  const isTailing = (configPath: string) => state.tailingConfigPath === configPath;
-
   useKeyboard((event) => {
     if (!isFocused()) return;
     if (state.modal) return;
@@ -51,19 +47,11 @@ export function ConfigsPanel() {
   const items = createMemo(() =>
     configs().map((config, i) => {
       const selected = i === selectedIndex();
-      const running = isRunning(config.path);
-      const tailing = isTailing(config.path);
-
-      let indicator = "  ";
-      if (running) indicator = " ●";
-      if (tailing) indicator = " ◉";
-
       const prefix = selected ? "> " : "  ";
 
       return {
         name: config.name,
         prefix,
-        indicator,
         selected,
         hasError: !!config.error,
       };
@@ -86,8 +74,8 @@ export function ConfigsPanel() {
       <For each={items()}>
         {(item) => (
           <text fg={item.hasError ? COLORS.error : item.selected ? COLORS.selected : COLORS.normal}>
-            <Show when={item.selected} fallback={<span>{item.prefix}{item.name}{item.indicator}</span>}>
-              <strong>{item.prefix}{item.name}{item.indicator}</strong>
+            <Show when={item.selected} fallback={<span>{item.prefix}{item.name}</span>}>
+              <strong>{item.prefix}{item.name}</strong>
             </Show>
           </text>
         )}

@@ -1,6 +1,6 @@
 import { For, createMemo, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { state, selectEnv, getSelectedConfig, getSelectedEnv, setFocusedPanel, openModal } from "../../state/store.ts";
+import { state, selectEnv, getSelectedConfig, getSelectedEnv, setFocusedPanel, openModal, hasActiveSession } from "../../state/store.ts";
 import { startDevSession } from "../../state/actions.ts";
 import { COLORS } from "../../themes/index.ts";
 
@@ -85,10 +85,9 @@ export function EnvironmentsPanel() {
       const selected = i === selectedEnvIndex();
       const prefix = selected ? "> " : "  ";
 
-      // Check if this env is currently being used
-      const isActive =
-        (state.isRunning || state.isTailing) &&
-        getSelectedEnv() === env;
+      // Check if this env has an active session
+      const config = getSelectedConfig();
+      const isActive = config ? hasActiveSession(config.path, env, "dev") || hasActiveSession(config.path, env, "tail") : false;
 
       return {
         name: env,

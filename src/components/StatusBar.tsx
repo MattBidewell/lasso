@@ -17,8 +17,6 @@ export function StatusBar() {
         return [...base, "j/k:nav", "Enter:view", "x:stop", "d:remove"];
       case "output":
         return [...base, "c:clear", "b:back"];
-      case "logs":
-        return [...base, "c:clear", "b:back"];
       default:
         return base;
     }

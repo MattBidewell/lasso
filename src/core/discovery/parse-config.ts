@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import stripJsonComments from 'strip-json-comments';
 import { WranglerConfigSchema } from '../types/wrangler.ts';
-import type { DiscoveredConfig } from '../types/app.ts';
+import type { DiscoveredConfig } from '../../types.ts';
 
 export function parseConfig(
   configPath: string,

@@ -1,11 +1,11 @@
 import { createMemo, createSignal } from "solid-js";
 import type { ScrollBoxRenderable } from "@opentui/core";
 import { useKeyboard } from "@opentui/solid";
-import { state, clearOutput, setFocusedPanel, setRightPanelView, getActiveSession, clearSessionOutput } from "../../state/store.ts";
-import { stopDev, stopDeploy, stopSession } from "../../state/actions.ts";
+import { state, setFocusedPanel, getActiveSession, clearSessionOutput } from "../../state/store.ts";
+import { stopSession } from "../../state/actions.ts";
 import { COLORS } from "../../themes/index.ts";
 
-const VISIBLE_HEIGHT = 50; // Approximate visible lines
+const VISIBLE_HEIGHT = 50;
 const PAGE_SIZE = 5;
 
 export function OutputPanel() {
@@ -13,20 +13,17 @@ export function OutputPanel() {
 
   const isFocused = () => state.focusedPanel === "output";
 
-  // Get output from active session or fall back to legacy output
   const output = () => {
     const activeId = state.activeSessionId;
     if (activeId && state.outputBySession[activeId]) {
       return state.outputBySession[activeId];
     }
-    return state.output;
+    return [];
   };
 
   const activeSession = () => getActiveSession();
-  const isRunning = () => state.isRunning || (activeSession()?.status === "running" && activeSession()?.action === "dev");
-  const isDeploying = () => state.isDeploying || (activeSession()?.status === "running" && activeSession()?.action === "deploy");
+  const isRunning = () => activeSession()?.status === "running";
 
-  // Scroll state
   const [isSticky, setIsSticky] = createSignal(true);
 
   const title = createMemo(() => {
@@ -34,10 +31,9 @@ export function OutputPanel() {
     let titleText = "Output";
 
     if (session) {
-      // Show session info: "Output: worker-name [env]"
-      titleText = `Output: ${session.displayName} [${session.environment}]`;
+      titleText = `${session.displayName} [${session.environment}]`;
       if (session.status === "running") {
-        titleText += session.action === "deploy" ? " (deploying)" : " (running)";
+        titleText += ` (${session.action})`;
       } else if (session.status === "stopping") {
         titleText += " (stopping)";
       } else if (session.status === "completed") {
@@ -45,12 +41,10 @@ export function OutputPanel() {
       } else if (session.status === "failed") {
         titleText += " (failed)";
       }
-    } else {
-      if (isRunning()) titleText = "Output (running)";
-      if (isDeploying()) titleText = "Output (deploying)";
+    } else if (isRunning()) {
+      titleText = "Output (running)";
     }
 
-    // Add scroll indicator when not sticky
     if (!isSticky() && scrollboxRef) {
       const maxOffset = Math.max(0, output().length - VISIBLE_HEIGHT);
       const currentOffset = scrollboxRef.scrollTop;
@@ -60,7 +54,6 @@ export function OutputPanel() {
     return titleText;
   });
 
-  // Scroll logic
   const scrollBy = (lines: number) => {
     setIsSticky(false);
     const maxOffset = Math.max(0, output().length - VISIBLE_HEIGHT);
@@ -86,12 +79,9 @@ export function OutputPanel() {
   };
 
   const handleClear = () => {
-    // Clear session output if there's an active session
     const session = activeSession();
     if (session) {
       clearSessionOutput(session.id);
-    } else {
-      clearOutput();
     }
     setIsSticky(true);
     if (scrollboxRef) {
@@ -127,31 +117,24 @@ export function OutputPanel() {
       case "c":
         handleClear();
         break;
-      case "ctrl-c":
-        // Stop active session or legacy process
+      case "ctrl-c": {
         const sessionToStop = activeSession();
-        if (sessionToStop && sessionToStop.status === "running") {
+        if (sessionToStop?.status === "running") {
           stopSession(sessionToStop.id);
-        } else {
-          if (isRunning()) stopDev();
-          if (isDeploying()) stopDeploy();
         }
         break;
+      }
       case "h":
       case "left":
       case "b":
-      case "escape":
-        // Stop process and go back to sessions panel
-        const sessionToStopAndLeave = activeSession();
-        if (sessionToStopAndLeave && sessionToStopAndLeave.status === "running") {
-          stopSession(sessionToStopAndLeave.id);
-        } else {
-          if (isRunning()) stopDev();
-          if (isDeploying()) stopDeploy();
+      case "escape": {
+        const sessionToStop = activeSession();
+        if (sessionToStop?.status === "running") {
+          stopSession(sessionToStop.id);
         }
-        setRightPanelView("about");
         setFocusedPanel("sessions");
         break;
+      }
     }
   });
 

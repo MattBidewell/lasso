@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
-import type { TailOptions } from '../types/app.ts';
+import type { TailOptions } from '../../types.ts';
 
 const stripAnsi = (str: string): string =>
   str.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');

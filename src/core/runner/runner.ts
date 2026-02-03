@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { DiscoveredConfig, DeployOptions, SessionAction, TailOptions } from "../../types.ts";
 
-export interface MultiProcessCallbacks {
+export interface RunnerCallbacks {
   onSessionStart: (sessionId: string, action: SessionAction) => void;
   onSessionEnd: (sessionId: string, code: number | null) => void;
   onSessionOutput: (sessionId: string, line: string) => void;
@@ -14,17 +14,17 @@ interface SessionProcess {
   action: SessionAction;
 }
 
-export class MultiProcessController {
+export class Runner {
   private sessions: Map<string, SessionProcess> = new Map();
-  private callbacks: MultiProcessCallbacks;
+  private callbacks: RunnerCallbacks;
 
-  constructor(callbacks: MultiProcessCallbacks) {
+  constructor(callbacks: RunnerCallbacks) {
     this.callbacks = callbacks;
   }
 
   startDev(config: DiscoveredConfig, environment: string): void {
     const sessionId = this.createSessionId(config.path, environment, "dev");
-    
+
     const args = ["wrangler", "dev", "-c", config.path];
     if (environment !== "default") {
       args.push("-e", environment);
@@ -35,7 +35,7 @@ export class MultiProcessController {
 
   startTail(config: DiscoveredConfig, environment: string, options: TailOptions = {}): void {
     const sessionId = this.createSessionId(config.path, environment, "tail");
-    
+
     const args = ["wrangler", "tail", "-c", config.path];
     if (environment !== "default") {
       args.push("-e", environment);
@@ -51,7 +51,7 @@ export class MultiProcessController {
 
   startDeploy(config: DiscoveredConfig, environment: string, options?: DeployOptions): void {
     const sessionId = this.createSessionId(config.path, environment, "deploy");
-    
+
     const args = ["wrangler", "deploy", "-c", config.path];
     if (environment !== "default") {
       args.push("-e", environment);

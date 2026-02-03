@@ -1,8 +1,30 @@
 import type { WranglerConfig } from "./core/types/wrangler.ts";
 
-// Re-export from existing types
+// Re-export from wrangler types
 export type { WranglerConfig, BindingCounts } from "./core/types/wrangler.ts";
-export type { TailOptions, DeployOptions } from "./core/types/app.ts";
+
+// Tail-specific options
+export interface TailOptions {
+  format?: "json" | "pretty";
+  status?: Array<"ok" | "error" | "canceled">;
+  methods?: string[];
+  samplingRate?: number;
+  search?: string;
+  ip?: string[];
+  header?: string;
+  versionId?: string;
+}
+
+// Deploy-specific options
+export interface DeployOptions {
+  dryRun?: boolean;
+  minify?: boolean;
+  keepVars?: boolean;
+  noBundle?: boolean;
+  uploadSourceMaps?: boolean;
+  compatibilityDate?: string;
+  name?: string;
+}
 
 export interface DiscoveredConfig {
   /** Absolute path to wrangler.json */
@@ -21,7 +43,8 @@ export interface DiscoveredConfig {
   environments: string[];
 }
 
-export type Panel = "configs" | "environments" | "bindings" | "sessions" | "output" | "logs";
+// UI panels
+export type Panel = "configs" | "environments" | "bindings" | "sessions" | "output";
 
 // Normalized binding type for display
 export type BindingType = "kv" | "d1" | "r2" | "do" | "service" | "queue" | "var";
@@ -33,10 +56,8 @@ export interface NormalizedBinding {
   displayName?: string; // Friendly name for display
   supportsRemote: boolean; // Whether this binding can toggle remote mode
 }
-export type RightPanelView = "about" | "output" | "logs";
-export type CommandType = "dev" | "deploy" | "tail" | null;
 
-// Session types for multi-process support
+// Session types
 export type SessionAction = "dev" | "tail" | "deploy";
 export type SessionStatus = "running" | "stopping" | "completed" | "failed";
 
@@ -61,12 +82,12 @@ export interface Session {
 export function createSessionId(
   configPath: string,
   environment: string,
-  action: SessionAction
+  action: SessionAction,
 ): string {
   return `${configPath}:${environment}:${action}`;
 }
 
-// Simplified modal types
+// Modal types
 export type ModalType = "deploy" | "tail" | "help" | null;
 
 export interface DeployModalState {
@@ -87,6 +108,7 @@ export interface HelpModalState {
 
 export type ModalState = DeployModalState | TailModalState | HelpModalState;
 
+// Main application state
 export interface AppState {
   // Config data
   configs: DiscoveredConfig[];
@@ -97,24 +119,9 @@ export interface AppState {
 
   // UI state
   focusedPanel: Panel;
-  rightPanelView: RightPanelView;
   modal: ModalState | null;
 
-  // Process state (legacy - kept for backward compatibility)
-  isRunning: boolean;
-  runningConfigPath: string | null;
-  isDeploying: boolean;
-  isTailing: boolean;
-  tailingConfigPath: string | null;
-  currentCommand: CommandType;
-
-  // Output (legacy)
-  output: string[];
-  outputByConfig: Record<string, string[]>;
-  tailOutput: string[];
-  tailOutputByConfig: Record<string, string[]>;
-
-  // Sessions - multi-process support
+  // Sessions and output
   sessions: Session[];
   selectedSessionIndex: number;
   activeSessionId: string | null;

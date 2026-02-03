@@ -70,8 +70,7 @@ export function SessionsPanel() {
         const selected = getSelectedSession();
         if (selected) {
           activateSession(selected.id);
-          // Navigate to the appropriate panel
-          setFocusedPanel(selected.action === "tail" ? "logs" : "output");
+          setFocusedPanel("output");
         }
         break;
       case "x":

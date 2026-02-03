@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
-import type { DeployOptions } from '../types/app.ts';
+import type { DeployOptions } from '../../types.ts';
 
 // Strip ANSI escape codes from output
 const stripAnsi = (str: string): string =>

@@ -1,23 +1,14 @@
 import { spawn } from "node:child_process";
-import { ProcessController, type ProcessControllerCallbacks } from "../core/runner/controller.ts";
-import { MultiProcessController, type MultiProcessCallbacks } from "../core/runner/multi-controller.ts";
-import type { DeployOptions, TailOptions, SessionAction } from "../types.ts";
+import { Runner, type RunnerCallbacks } from "../core/runner/index.ts";
+import type { DeployOptions, TailOptions } from "../types.ts";
 import { createSessionId } from "../types.ts";
 import {
   state,
   getSelectedConfig,
   getSelectedEnv,
-  setRunning,
-  setDeploying,
-  setTailing,
-  appendOutput,
-  appendTailOutput,
-  clearOutput,
-  clearTailOutput,
   openModal,
   closeModal,
-  setRightPanelView,
-  // Session actions
+  setFocusedPanel,
   addSession,
   updateSessionStatus,
   removeSession,
@@ -42,7 +33,7 @@ export function setRenderer(renderer: { destroy: () => void }): void {
 }
 
 export function exitApp(): void {
-  stopAll();
+  runner?.stopAll();
   rendererInstance?.destroy();
   process.exit(0);
 }
@@ -51,110 +42,31 @@ export function setRenderCallback(callback: () => void): void {
   triggerRender = callback;
 }
 
-// ProcessController callbacks that integrate with our store
-const callbacks: ProcessControllerCallbacks = {
-  onOutputLine: (line) => {
-    appendOutput(line);
+// ============ Runner Setup ============
+
+const runnerCallbacks: RunnerCallbacks = {
+  onSessionStart: (_sessionId, _action) => {
+    // Session is added before calling startDev/startTail/startDeploy
   },
-  onDevStart: () => {
-    const config = getSelectedConfig();
-    setRunning(true, config?.path ?? null);
-    clearOutput();
+  onSessionEnd: (sessionId, code) => {
+    const status = code === 0 ? "completed" : "failed";
+    updateSessionStatus(sessionId, status);
   },
-  onDevEnd: (_code) => {
-    setRunning(false);
-  },
-  onDeployStart: () => {
-    setDeploying(true);
-    clearOutput();
-  },
-  onDeployEnd: () => {
-    setDeploying(false);
-  },
-  onTailStart: () => {
-    const config = getSelectedConfig();
-    setTailing(true, config?.path ?? null);
-    clearTailOutput();
-  },
-  onTailEnd: (_code) => {
-    setTailing(false);
-  },
-  onTailOutputLine: (line) => {
-    appendTailOutput(line);
+  onSessionOutput: (sessionId, line) => {
+    appendSessionOutput(sessionId, line);
   },
   onRender: () => {
     triggerRender?.();
   },
 };
 
-// Create the process controller instance
-let processController: ProcessController | null = null;
+let runner: Runner | null = null;
 
-export function getProcessController(): ProcessController {
-  if (!processController) {
-    processController = new ProcessController(callbacks);
+export function getRunner(): Runner {
+  if (!runner) {
+    runner = new Runner(runnerCallbacks);
   }
-  return processController;
-}
-
-// ============ Process Actions ============
-
-export function startDev(): void {
-  const config = getSelectedConfig();
-  const env = getSelectedEnv();
-
-  if (!config?.config) {
-    appendOutput("Error: No valid config selected");
-    return;
-  }
-
-  getProcessController().startDevServer(config, env);
-}
-
-export function stopDev(): void {
-  getProcessController().stopDevServer();
-}
-
-export function startDeploy(options?: DeployOptions): void {
-  const config = getSelectedConfig();
-  const env = getSelectedEnv();
-
-  if (!config?.config) {
-    appendOutput("Error: No valid config selected");
-    return;
-  }
-
-  closeModal();
-  getProcessController().startDeploy(config, env, options);
-}
-
-export function stopDeploy(): void {
-  getProcessController().stopDeploy();
-}
-
-export function startTail(options: TailOptions = {}): void {
-  const config = getSelectedConfig();
-  const env = getSelectedEnv();
-
-  if (!config?.config) {
-    appendTailOutput("Error: No valid config selected");
-    return;
-  }
-
-  closeModal();
-  getProcessController().startTail(config, env, options);
-}
-
-export function stopTail(): void {
-  getProcessController().stopTail();
-}
-
-export function stopAll(): void {
-  getProcessController().stopAll();
-  // Also stop all multi-process sessions
-  if (multiController) {
-    multiController.stopAll();
-  }
+  return runner;
 }
 
 // ============ Modal Actions ============
@@ -192,24 +104,27 @@ export function showHelpModal(): void {
 // ============ Navigation Shortcuts ============
 
 export function handleEnter(): void {
-  if (state.isRunning) {
-    stopDev();
+  const session = getSelectedSession();
+  if (session?.status === "running" && session.action === "dev") {
+    stopSession(session.id);
   } else {
-    startDev();
+    startDevSession();
   }
 }
 
 export function handleDeployKey(): void {
-  if (state.isDeploying) {
-    stopDeploy();
+  const session = getSelectedSession();
+  if (session?.status === "running" && session.action === "deploy") {
+    stopSession(session.id);
   } else {
     showDeployModal();
   }
 }
 
 export function handleTailKey(): void {
-  if (state.isTailing) {
-    stopTail();
+  const session = getSelectedSession();
+  if (session?.status === "running" && session.action === "tail") {
+    stopSession(session.id);
   } else {
     showTailModal();
   }
@@ -218,12 +133,12 @@ export function handleTailKey(): void {
 export function handleEscape(): void {
   if (state.modal) {
     closeModal();
-  } else if (state.isRunning) {
-    stopDev();
-    setRightPanelView("about");
-  } else if (state.isTailing) {
-    stopTail();
-    setRightPanelView("about");
+  } else {
+    const session = getSelectedSession();
+    if (session?.status === "running") {
+      stopSession(session.id);
+    }
+    setFocusedPanel("sessions");
   }
 }
 
@@ -235,67 +150,29 @@ export function openInEditor(): void {
 
   const editor = process.env.EDITOR || process.env.VISUAL || "vi";
 
-  // Spawn the editor detached so we don't block
   const child = spawn(editor, [config.path], {
     stdio: "inherit",
     detached: true,
   });
 
-  // Prevent the child process from keeping the parent alive
   child.unref();
 }
 
-// ============ Multi-Process Session Actions ============
+// ============ Session Actions ============
 
-// MultiProcessController callbacks that integrate with our store
-const multiCallbacks: MultiProcessCallbacks = {
-  onSessionStart: (_sessionId, _action) => {
-    // Session is added before calling startDev/startTail/startDeploy
-    // This callback can be used for additional logging if needed
-  },
-  onSessionEnd: (sessionId, code) => {
-    const status = code === 0 ? "completed" : "failed";
-    updateSessionStatus(sessionId, status);
-  },
-  onSessionOutput: (sessionId, line) => {
-    appendSessionOutput(sessionId, line);
-  },
-  onRender: () => {
-    triggerRender?.();
-  },
-};
-
-// Create the multi-process controller instance
-let multiController: MultiProcessController | null = null;
-
-export function getMultiController(): MultiProcessController {
-  if (!multiController) {
-    multiController = new MultiProcessController(multiCallbacks);
-  }
-  return multiController;
-}
-
-/**
- * Start a dev server session for the currently selected config/env
- */
 export function startDevSession(): void {
   const config = getSelectedConfig();
   const env = getSelectedEnv();
 
-  if (!config?.config) {
-    return;
-  }
+  if (!config?.config) return;
 
   const sessionId = createSessionId(config.path, env, "dev");
 
-  // Check if session already exists
   if (getSession(sessionId)) {
-    // Just activate the existing session
     activateSession(sessionId);
     return;
   }
 
-  // Add session to store first
   addSession({
     id: sessionId,
     configPath: config.path,
@@ -306,30 +183,22 @@ export function startDevSession(): void {
     startedAt: Date.now(),
   });
 
-  // Activate and show output
   activateSession(sessionId);
-  setRightPanelView("output");
+  setFocusedPanel("output");
 
-  // Start the process
-  getMultiController().startDev(config, env);
+  getRunner().startDev(config, env);
 }
 
-/**
- * Start a tail session for the currently selected config/env
- */
 export function startTailSession(options: TailOptions = {}): void {
   const config = getSelectedConfig();
   const env = getSelectedEnv();
 
-  if (!config?.config) {
-    return;
-  }
+  if (!config?.config) return;
 
   closeModal();
 
   const sessionId = createSessionId(config.path, env, "tail");
 
-  // Check if session already exists
   if (getSession(sessionId)) {
     activateSession(sessionId);
     return;
@@ -346,27 +215,21 @@ export function startTailSession(options: TailOptions = {}): void {
   });
 
   activateSession(sessionId);
-  setRightPanelView("logs");
+  setFocusedPanel("output");
 
-  getMultiController().startTail(config, env, options);
+  getRunner().startTail(config, env, options);
 }
 
-/**
- * Start a deploy session for the currently selected config/env
- */
 export function startDeploySession(options?: DeployOptions): void {
   const config = getSelectedConfig();
   const env = getSelectedEnv();
 
-  if (!config?.config) {
-    return;
-  }
+  if (!config?.config) return;
 
   closeModal();
 
   const sessionId = createSessionId(config.path, env, "deploy");
 
-  // Check if session already exists
   if (getSession(sessionId)) {
     activateSession(sessionId);
     return;
@@ -383,25 +246,19 @@ export function startDeploySession(options?: DeployOptions): void {
   });
 
   activateSession(sessionId);
-  setRightPanelView("output");
+  setFocusedPanel("output");
 
-  getMultiController().startDeploy(config, env, options);
+  getRunner().startDeploy(config, env, options);
 }
 
-/**
- * Stop a specific session by ID
- */
 export function stopSession(sessionId: string): void {
   const session = getSession(sessionId);
   if (session && session.status === "running") {
     updateSessionStatus(sessionId, "stopping");
-    getMultiController().stop(sessionId);
+    getRunner().stop(sessionId);
   }
 }
 
-/**
- * Stop the currently selected session in the sessions panel
- */
 export function stopSelectedSession(): void {
   const session = getSelectedSession();
   if (session) {
@@ -409,9 +266,6 @@ export function stopSelectedSession(): void {
   }
 }
 
-/**
- * Remove a session from the list (only if not running)
- */
 export function removeSessionFromList(sessionId: string): void {
   const session = getSession(sessionId);
   if (session && session.status !== "running" && session.status !== "stopping") {
@@ -419,9 +273,6 @@ export function removeSessionFromList(sessionId: string): void {
   }
 }
 
-/**
- * Remove the currently selected session from the list
- */
 export function removeSelectedSession(): void {
   const session = getSelectedSession();
   if (session) {
@@ -429,19 +280,9 @@ export function removeSelectedSession(): void {
   }
 }
 
-/**
- * Clear output for a specific session
- */
 export function clearSelectedSessionOutput(): void {
   const session = getSelectedSession();
   if (session) {
     clearSessionOutput(session.id);
   }
-}
-
-/**
- * Stop all sessions
- */
-export function stopAllSessions(): void {
-  getMultiController().stopAll();
 }
