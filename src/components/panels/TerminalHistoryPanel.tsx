@@ -1,6 +1,6 @@
 import { For, Show, createMemo } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { state, selectHistory, activateSession, setFocusedPanel } from "../../state/store.ts";
+import { state, selectHistory, activateExecution, setFocusedPanel } from "../../state/store.ts";
 import { COLORS } from "../../themes/index.ts";
 import type { SessionAction } from "../../types.ts";
 
@@ -22,20 +22,19 @@ export function TerminalHistoryPanel() {
   
   // Get all sessions sorted by timestamp (most recent first)
   const history = createMemo(() => {
-    return [...state.sessions]
+    return [...state.executions]
       .sort((a, b) => b.startedAt - a.startedAt)
       .slice(0, MAX_HISTORY_LINES)
-      .map((session) => {
-        const command = buildCommand(session.action, session.configPath, session.environment);
+      .map((execution) => {
         return {
-          id: session.id,
-          timestamp: session.startedAt,
-          configPath: session.configPath,
-          environment: session.environment,
-          action: session.action,
-          displayName: session.displayName,
-          status: session.status === "stopping" ? "running" : session.status,
-          command,
+          id: execution.id,
+          timestamp: execution.startedAt,
+          configPath: execution.configPath,
+          environment: execution.environment,
+          action: execution.action,
+          displayName: execution.displayName,
+          status: execution.status === "stopping" ? "running" : execution.status,
+          command: execution.command,
         };
       });
   });
@@ -55,7 +54,7 @@ export function TerminalHistoryPanel() {
   const getStatusIcon = (status: string): string => {
     switch (status) {
       case "running": return "●";
-      case "completed": return "✓";
+      case "completed": return " ";
       case "failed": return "✗";
       default: return " ";
     }
@@ -66,38 +65,39 @@ export function TerminalHistoryPanel() {
     return `${value.slice(0, max - 3)}...`;
   };
 
-  const buildCommand = (action: SessionAction, configPath: string, environment: string): string => {
-    const base = `npx wrangler ${action}`;
-    const config = `-c ${configPath}`;
-    const env = environment !== "default" ? `-e ${environment}` : "";
-    return `${base} ${config} ${env}`.trim();
-  };
-
   useKeyboard((event) => {
     if (!isFocused()) return;
     if (state.modal) return;
 
     const itemCount = history().length;
+
+    const previewHistory = (index: number) => {
+      selectHistory(index);
+      const entry = history()[index];
+      if (entry) {
+        activateExecution(entry.id);
+      }
+    };
     
     switch (event.name) {
       case "j":
       case "down":
-        selectHistory(Math.min(selectedIndex() + 1, itemCount - 1));
+        previewHistory(Math.min(selectedIndex() + 1, itemCount - 1));
         break;
       case "k":
       case "up":
-        selectHistory(Math.max(selectedIndex() - 1, 0));
+        previewHistory(Math.max(selectedIndex() - 1, 0));
         break;
       case "g":
-        selectHistory(0);
+        previewHistory(0);
         break;
       case "G":
-        selectHistory(itemCount - 1);
+        previewHistory(itemCount - 1);
         break;
       case "return": {
         const entry = history()[selectedIndex()];
         if (entry) {
-          activateSession(entry.id);
+          activateExecution(entry.id);
           setFocusedPanel("output");
         }
         break;
@@ -125,8 +125,9 @@ export function TerminalHistoryPanel() {
           const prefix = createMemo(() => selected() ? "> " : "  ");
           const time = formatTime(entry.timestamp);
           const icon = getStatusIcon(entry.status);
+          const shortId = entry.id.slice(-6);
           const summary = createMemo(() =>
-            `${prefix()}${icon} [${time}] ${entry.displayName} [${entry.environment}] ${entry.action}`
+            `${prefix()}${icon} [${time}] ${entry.displayName} [${entry.environment}] ${entry.action} #${shortId}`
           );
           const content = createMemo(() => `${prefix()}${icon} [${time}] ${truncate(entry.command)}`);
           const commandLine = createMemo(() => `  ${entry.command}`);
@@ -136,11 +137,9 @@ export function TerminalHistoryPanel() {
               ? COLORS.selected
               : entry.status === "failed"
                 ? COLORS.error
-                : entry.status === "completed"
-                  ? COLORS.success
-                  : entry.status === "running"
-                    ? COLORS.accent
-                    : COLORS.normal
+                : entry.status === "running"
+                  ? COLORS.accent
+                  : COLORS.normal
           );
 
           return (

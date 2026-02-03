@@ -60,6 +60,7 @@ export function HelpModal() {
       <text> </text>
       <text fg={COLORS.normal}><strong>  Output Panel</strong></text>
       <text fg={COLORS.normal}>    c             Clear output</text>
+      <text fg={COLORS.normal}>    x             Stop running session</text>
       <text fg={COLORS.normal}>    k             Stop running session</text>
       <text fg={COLORS.normal}>    Ctrl+C        Stop running session</text>
       <text> </text>

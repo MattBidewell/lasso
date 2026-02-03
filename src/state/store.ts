@@ -1,5 +1,16 @@
 import { createStore } from "solid-js/store";
-import type { AppState, DiscoveredConfig, ModalState, Panel, NormalizedBinding, Session, SessionAction, SessionStatus } from "../types.ts";
+import type {
+  AppState,
+  DiscoveredConfig,
+  ModalState,
+  Panel,
+  NormalizedBinding,
+  OutputLine,
+  Execution,
+  Session,
+  SessionAction,
+  SessionStatus,
+} from "../types.ts";
 import { createSessionId } from "../types.ts";
 
 const MAX_OUTPUT_LINES = 500;
@@ -16,13 +27,16 @@ function createInitialState(cwd: string): AppState {
     // UI state
     focusedPanel: "configs",
     modal: null,
+    ansiEnabled: true,
 
-    // Sessions and output
-    sessions: [],
+    // Executions and output
+    executions: [],
+    sessionIndex: {},
     selectedActionIndex: 0,
     selectedHistoryIndex: 0,
     activeSessionId: null,
-    outputBySession: {},
+    activeExecutionId: null,
+    outputByExecution: {},
 
     // Status
     statusMessage: null,
@@ -102,6 +116,10 @@ export function closeModal(): void {
 
 export function setStatusMessage(message: string | null): void {
   setState("statusMessage", message);
+}
+
+export function setAnsiEnabled(enabled: boolean): void {
+  setState("ansiEnabled", enabled);
 }
 
 // ============ Derived State (Selectors) ============
@@ -209,38 +227,39 @@ export function getBindings(): NormalizedBinding[] {
   return bindings;
 }
 
-// ============ Session Actions ============
+// ============ Execution Actions ============
 
-export function addSession(session: Session): void {
-  setState("sessions", (sessions) => [...sessions, session]);
-  setState("activeSessionId", session.id);
+export function addExecution(execution: Execution): void {
+  setState("executions", (executions) => [...executions, execution]);
+  setState("sessionIndex", execution.sessionId, {
+    id: execution.sessionId,
+    executionId: execution.id,
+    status: execution.status,
+  });
+  setState("activeExecutionId", execution.id);
+  setState("activeSessionId", execution.sessionId);
+  setState("outputByExecution", execution.id, []);
 }
 
-export function updateSessionStatus(sessionId: string, status: SessionStatus): void {
-  const index = state.sessions.findIndex((s) => s.id === sessionId);
-  if (index >= 0) {
-    setState("sessions", index, "status", status);
-  }
-}
-
-export function removeSession(sessionId: string): void {
-  const index = state.sessions.findIndex((s) => s.id === sessionId);
+export function updateExecutionStatus(
+  executionId: string,
+  status: SessionStatus,
+  endedAt?: number,
+): void {
+  const index = state.executions.findIndex((e) => e.id === executionId);
   if (index < 0) return;
 
-  setState("sessions", (sessions) => sessions.filter((s) => s.id !== sessionId));
-
-  if (state.activeSessionId === sessionId) {
-    const remaining = state.sessions;
-    setState("activeSessionId", remaining.length > 0 ? remaining[0]!.id : null);
+  const execution = state.executions[index]!;
+  setState("executions", index, "status", status);
+  if (endedAt) {
+    setState("executions", index, "endedAt", endedAt);
   }
 
-  if (state.selectedHistoryIndex >= state.sessions.length) {
-    setState("selectedHistoryIndex", Math.max(0, state.sessions.length - 1));
+  const sessionId = execution.sessionId;
+  const current = state.sessionIndex[sessionId];
+  if (current?.executionId === executionId) {
+    setState("sessionIndex", sessionId, "status", status);
   }
-
-  // Clean up output buffer
-  const { [sessionId]: _, ...rest } = state.outputBySession;
-  setState("outputBySession", rest);
 }
 
 export function selectAction(index: number): void {
@@ -248,12 +267,39 @@ export function selectAction(index: number): void {
   setState("selectedActionIndex", clamped);
 }
 
+export function activateExecution(executionId: string): void {
+  const execution = state.executions.find((e) => e.id === executionId);
+  if (!execution) return;
+  setState("activeExecutionId", executionId);
+  setState("activeSessionId", execution.sessionId);
+}
+
+export function clearActiveExecution(): void {
+  setState("activeExecutionId", null);
+}
+
 export function activateSession(sessionId: string): void {
   setState("activeSessionId", sessionId);
+  const latest = getLatestExecution(sessionId);
+  if (latest) {
+    setState("activeExecutionId", latest.id);
+  }
+}
+
+export function getExecution(executionId: string): Execution | undefined {
+  return state.executions.find((e) => e.id === executionId);
+}
+
+export function getLatestExecution(sessionId: string): Execution | undefined {
+  const executions = state.executions.filter((e) => e.sessionId === sessionId);
+  if (executions.length === 0) return undefined;
+  return executions.reduce((latest, current) =>
+    current.startedAt > latest.startedAt ? current : latest
+  );
 }
 
 export function getSession(sessionId: string): Session | undefined {
-  return state.sessions.find((s) => s.id === sessionId);
+  return state.sessionIndex[sessionId];
 }
 
 export function getSelectedSession(): Session | undefined {
@@ -270,43 +316,62 @@ export function getSelectedSession(): Session | undefined {
   return getSession(sessionId);
 }
 
+export function getSelectedExecution(): Execution | undefined {
+  const config = getSelectedConfig();
+  const env = getSelectedEnv();
+  if (!config || !env) return undefined;
+
+  const actions: SessionAction[] = ["dev", "deploy", "tail"];
+  const action = actions[state.selectedActionIndex];
+  if (!action) return undefined;
+
+  const sessionId = createSessionId(config.path, env, action);
+  return getLatestExecution(sessionId);
+}
+
 export function getActiveSession(): Session | undefined {
-  return state.sessions.find((s) => s.id === state.activeSessionId);
+  if (!state.activeSessionId) return undefined;
+  return state.sessionIndex[state.activeSessionId];
+}
+
+export function getActiveExecution(): Execution | undefined {
+  if (!state.activeExecutionId) return undefined;
+  return getExecution(state.activeExecutionId);
 }
 
 export function selectHistory(index: number): void {
-  const clamped = Math.max(0, Math.min(index, state.sessions.length - 1));
+  const clamped = Math.max(0, Math.min(index, state.executions.length - 1));
   setState("selectedHistoryIndex", clamped);
 }
 
-export function getSelectedHistory(): Session | undefined {
-  return state.sessions[state.selectedHistoryIndex];
+export function getSelectedHistory(): Execution | undefined {
+  return state.executions[state.selectedHistoryIndex];
 }
 
 export function hasActiveSession(configPath: string, environment: string, action: SessionAction): boolean {
   const id = createSessionId(configPath, environment, action);
-  return state.sessions.some((s) => s.id === id && s.status === "running");
+  return state.sessionIndex[id]?.status === "running";
 }
 
 // ============ Output Actions ============
 
-export function appendSessionOutput(sessionId: string, line: string): void {
-  setState("outputBySession", sessionId, (lines) =>
+export function appendExecutionOutput(executionId: string, line: OutputLine): void {
+  setState("outputByExecution", executionId, (lines) =>
     [...(lines ?? []), line].slice(-MAX_OUTPUT_LINES)
   );
 }
 
-export function clearSessionOutput(sessionId: string): void {
-  setState("outputBySession", sessionId, []);
+export function clearExecutionOutput(executionId: string): void {
+  setState("outputByExecution", executionId, []);
 }
 
-export function getSessionOutput(sessionId: string): string[] {
-  return state.outputBySession[sessionId] ?? [];
+export function getExecutionOutput(executionId: string): OutputLine[] {
+  return state.outputByExecution[executionId] ?? [];
 }
 
-export function getActiveOutput(): string[] {
-  if (!state.activeSessionId) return [];
-  return state.outputBySession[state.activeSessionId] ?? [];
+export function getActiveOutput(): OutputLine[] {
+  if (!state.activeExecutionId) return [];
+  return state.outputByExecution[state.activeExecutionId] ?? [];
 }
 
 // ============ Reinitialize ============

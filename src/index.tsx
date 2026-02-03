@@ -1,7 +1,7 @@
 import path from "node:path";
 import { render } from "@opentui/solid";
 import { App } from "./App.tsx";
-import { setConfigs, addConfig, removeConfig, setStatusMessage } from "./state/store.ts";
+import { setConfigs, addConfig, removeConfig, setStatusMessage, setAnsiEnabled } from "./state/store.ts";
 import { setRenderCallback, exitApp } from "./state/actions.ts";
 import { findWranglerConfigs, discoverAndParse, watchWranglerConfigs } from "./core/discovery/index.ts";
 import { parseConfig } from "./core/discovery/parse-config.ts";
@@ -13,6 +13,7 @@ let watcher: FSWatcher | null = null;
 async function main() {
   const cliOptions = parseArgs();
   const cwd = cliOptions.targetPath;
+  setAnsiEnabled(cliOptions.ansiEnabled);
 
   // Set up render callback for process controller
   setRenderCallback(() => {

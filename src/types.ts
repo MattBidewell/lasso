@@ -57,13 +57,28 @@ export interface NormalizedBinding {
   supportsRemote: boolean; // Whether this binding can toggle remote mode
 }
 
+export interface OutputSegment {
+  text: string;
+  fg?: string;
+  bg?: string;
+  bold?: boolean;
+  underline?: boolean;
+}
+
+export interface OutputLine {
+  raw: string;
+  segments: OutputSegment[];
+}
+
 // Session types
 export type SessionAction = "dev" | "tail" | "deploy";
 export type SessionStatus = "running" | "stopping" | "completed" | "failed";
 
-export interface Session {
-  /** Unique identifier: configPath:environment:action */
+export interface Execution {
+  /** Unique identifier for a single execution */
   id: string;
+  /** Stable session key: configPath:environment:action */
+  sessionId: string;
   /** Absolute path to the config file */
   configPath: string;
   /** Environment name */
@@ -74,8 +89,21 @@ export interface Session {
   status: SessionStatus;
   /** Display name (worker name from config) */
   displayName: string;
-  /** Timestamp when session started */
+  /** Timestamp when execution started */
   startedAt: number;
+  /** Timestamp when execution ended */
+  endedAt?: number;
+  /** Command used for this execution */
+  command: string;
+}
+
+export interface Session {
+  /** Stable session key: configPath:environment:action */
+  id: string;
+  /** Current execution id */
+  executionId: string;
+  /** Current status */
+  status: SessionStatus;
 }
 
 /** Helper to generate session ID */
@@ -120,13 +148,16 @@ export interface AppState {
   // UI state
   focusedPanel: Panel;
   modal: ModalState | null;
+  ansiEnabled: boolean;
 
-  // Sessions and output
-  sessions: Session[];
+  // Executions and output
+  executions: Execution[];
+  sessionIndex: Record<string, Session>;
   selectedActionIndex: number;
   selectedHistoryIndex: number;
   activeSessionId: string | null;
-  outputBySession: Record<string, string[]>;
+  activeExecutionId: string | null;
+  outputByExecution: Record<string, OutputLine[]>;
 
   // Status
   statusMessage: string | null;

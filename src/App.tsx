@@ -102,9 +102,9 @@ export function App() {
 
         <box flexDirection="column" width="67%" height="100%">
           <box height="70%">
-            <Show when={state.activeSessionId} fallback={<AboutPanel />}>
-              <OutputPanel />
-            </Show>
+          <Show when={state.activeExecutionId} fallback={<AboutPanel />}>
+            <OutputPanel />
+          </Show>
           </box>
           <box height="30%">
             <TerminalHistoryPanel />

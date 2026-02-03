@@ -1,48 +1,57 @@
-import { createMemo, createSignal } from "solid-js";
-import type { ScrollBoxRenderable } from "@opentui/core";
+import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { state, getActiveSession, clearSessionOutput } from "../../state/store.ts";
+import { state, getActiveExecution, getActiveSession, clearExecutionOutput } from "../../state/store.ts";
 import { stopSession } from "../../state/actions.ts";
 import { COLORS } from "../../themes/index.ts";
+import type { OutputSegment } from "../../types.ts";
 
 const VISIBLE_HEIGHT = 50;
 const PAGE_SIZE = 5;
 
 export function OutputPanel() {
-  let scrollboxRef: ScrollBoxRenderable | undefined;
+  let scrollboxRef: any;
+  const setScrollboxRef = (el: any) => {
+    scrollboxRef = el;
+  };
 
   const isFocused = () => state.focusedPanel === "output";
 
   const output = () => {
-    const activeId = state.activeSessionId;
-    if (activeId && state.outputBySession[activeId]) {
-      return state.outputBySession[activeId];
+    const activeId = state.activeExecutionId;
+    if (activeId && state.outputByExecution[activeId]) {
+      return state.outputByExecution[activeId];
     }
     return [];
   };
 
+  const activeExecution = () => getActiveExecution();
   const activeSession = () => getActiveSession();
   const isRunning = () => activeSession()?.status === "running";
 
   const [isSticky, setIsSticky] = createSignal(true);
 
-  const title = createMemo(() => {
-    const session = activeSession();
-    let titleText = "Output";
+  createEffect(() => {
+    state.activeExecutionId;
+    setIsSticky(true);
+    if (scrollboxRef) {
+      scrollboxRef.scrollTop = 0;
+    }
+  });
 
-    if (session) {
-      titleText = `${session.displayName} [${session.environment}]`;
-      if (session.status === "running") {
-        titleText += ` (${session.action})`;
-      } else if (session.status === "stopping") {
+  const title = createMemo(() => {
+    const execution = activeExecution();
+    let titleText = "[5] Output";
+
+    if (execution) {
+      const shortId = execution.id.slice(-6);
+      titleText = `[5] Output · ${execution.displayName} [${execution.environment}] ${execution.action} #${shortId}`;
+      if (execution.status === "stopping") {
         titleText += " (stopping)";
-      } else if (session.status === "completed") {
-        titleText += " (done)";
-      } else if (session.status === "failed") {
+      } else if (execution.status === "failed") {
         titleText += " (failed)";
       }
     } else if (isRunning()) {
-      titleText = "Output (running)";
+      titleText = "[5] Output (running)";
     }
 
     if (!isSticky() && scrollboxRef) {
@@ -79,9 +88,9 @@ export function OutputPanel() {
   };
 
   const handleClear = () => {
-    const session = activeSession();
-    if (session) {
-      clearSessionOutput(session.id);
+    const execution = activeExecution();
+    if (execution) {
+      clearExecutionOutput(execution.id);
     }
     setIsSticky(true);
     if (scrollboxRef) {
@@ -125,6 +134,13 @@ export function OutputPanel() {
       case "c":
         handleClear();
         break;
+      case "x": {
+        const sessionToStop = activeSession();
+        if (sessionToStop?.status === "running") {
+          stopSession(sessionToStop.id);
+        }
+        break;
+      }
       case "ctrl-c": {
         const sessionToStop = activeSession();
         if (sessionToStop?.status === "running") {
@@ -135,10 +151,28 @@ export function OutputPanel() {
     }
   });
 
+  const renderSegment = (segment: OutputSegment) => {
+    let node: unknown = segment.text;
+    if (segment.bold) {
+      node = <strong>{node}</strong>;
+    }
+    if (segment.underline) {
+      node = <u>{node}</u>;
+    }
+
+    const spanProps = { fg: segment.fg, bg: segment.bg } as Record<string, unknown>;
+
+    return (
+      <span {...spanProps}>
+        {node}
+      </span>
+    );
+  };
+
   return (
     <scrollbox
-      ref={scrollboxRef}
-      title="[5] Output"
+      ref={setScrollboxRef}
+      title={title()}
       border={true}
       borderStyle="rounded"
       borderColor={isFocused() ? COLORS.activeBorder : COLORS.inactiveBorder}
@@ -148,11 +182,25 @@ export function OutputPanel() {
       stickyScroll={isSticky()}
       stickyStart="bottom"
     >
-      {output().length === 0 ? (
-        <text fg={COLORS.muted}>  No output yet. Select config, environment, and action (press 4).</text>
-      ) : (
-        <text fg={COLORS.normal}>{output().join("\n")}</text>
-      )}
+      <Show
+        when={output().length > 0}
+        fallback={<text fg={COLORS.muted}>  No output yet. Select config, environment, and action (press 4).</text>}
+      >
+        <text fg={COLORS.normal}>
+          <For each={output()}>
+            {(line, i) => (
+              <span>
+                <For each={line.segments}>
+                  {(segment) => renderSegment(segment)}
+                </For>
+                <Show when={i() < output().length - 1}>
+                  <br />
+                </Show>
+              </span>
+            )}
+          </For>
+        </text>
+      </Show>
     </scrollbox>
   );
 }

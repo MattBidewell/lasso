@@ -3,10 +3,11 @@ import { useKeyboard } from "@opentui/solid";
 import {
   state,
   selectAction,
-  activateSession,
   getSelectedConfig,
   getSelectedEnv,
-  getSession,
+  getLatestExecution,
+  activateExecution,
+  clearActiveExecution,
   setFocusedPanel,
 } from "../../state/store.ts";
 import {
@@ -22,7 +23,7 @@ import { createSessionId } from "../../types.ts";
 const STATUS_ICONS: Record<SessionStatus, string> = {
   running: "●",
   stopping: "◌",
-  completed: "✓",
+  completed: " ",
   failed: "✗",
 };
 
@@ -39,6 +40,7 @@ interface ActionItem {
   action: SessionAction;
   status?: SessionStatus;
   isRunning: boolean;
+  executionId?: string;
 }
 
 export function ActionsPanel() {
@@ -60,12 +62,13 @@ export function ActionsPanel() {
 
     return ALL_ACTIONS.map((action) => {
       const sessionId = createSessionId(currentConfig.path, currentEnv, action);
-      const session = getSession(sessionId);
+      const execution = getLatestExecution(sessionId);
 
       return {
         action,
-        status: session?.status,
-        isRunning: session?.status === "running",
+        status: execution?.status,
+        isRunning: execution?.status === "running",
+        executionId: execution?.id,
       };
     });
   });
@@ -82,11 +85,13 @@ export function ActionsPanel() {
     if (!action) return;
 
     const sessionId = createSessionId(currentConfig.path, currentEnv, action);
-    const session = getSession(sessionId);
+    const execution = getLatestExecution(sessionId);
 
-    // Activate session to show its output in the output panel
-    if (session) {
-      activateSession(sessionId);
+    // Activate execution to show its output in the output panel
+    if (execution) {
+      activateExecution(execution.id);
+    } else {
+      clearActiveExecution();
     }
   };
 
@@ -100,8 +105,9 @@ export function ActionsPanel() {
 
     // If already running, just go to output
     if (item.isRunning) {
-      const sessionId = createSessionId(currentConfig.path, currentEnv, item.action);
-      activateSession(sessionId);
+      if (item.executionId) {
+        activateExecution(item.executionId);
+      }
       setFocusedPanel("output");
       return;
     }
@@ -187,11 +193,9 @@ export function ActionsPanel() {
               ? COLORS.selected
               : item.status === "failed"
                 ? COLORS.error
-                : item.status === "completed"
-                  ? COLORS.success
-                  : item.status === "running"
-                    ? COLORS.accent
-                    : COLORS.normal
+              : item.status === "running"
+                ? COLORS.accent
+                : COLORS.normal
           );
 
           return (
