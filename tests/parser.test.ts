@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import path from 'node:path';
-import { parseConfig } from '../src/discovery/parse-config.ts';
+import { parseConfig } from '../src/core/discovery/parse-config.ts';
 
 const fixturesPath = path.join(import.meta.dir, 'fixtures');
 

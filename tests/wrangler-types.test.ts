@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { WranglerConfigSchema, countBindings } from '../src/types/wrangler.ts';
+import { WranglerConfigSchema, countBindings } from '../src/core/types/wrangler.ts';
 
 describe('WranglerConfigSchema', () => {
   test('validates minimal config', () => {

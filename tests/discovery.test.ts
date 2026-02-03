@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeAll } from 'bun:test';
 import path from 'node:path';
-import { findWranglerConfigs } from '../src/discovery/find-configs.ts';
+import { findWranglerConfigs } from '../src/core/discovery/find-configs.ts';
 
 const fixturesPath = path.join(import.meta.dir, 'fixtures');
 
