@@ -44,7 +44,7 @@ export interface DiscoveredConfig {
 }
 
 // UI panels
-export type Panel = "configs" | "environments" | "bindings" | "actions" | "output";
+export type Panel = "configs" | "environments" | "bindings" | "actions" | "output" | "history";
 
 // Normalized binding type for display
 export type BindingType = "kv" | "d1" | "r2" | "do" | "service" | "queue" | "var";
@@ -124,6 +124,7 @@ export interface AppState {
   // Sessions and output
   sessions: Session[];
   selectedActionIndex: number;
+  selectedHistoryIndex: number;
   activeSessionId: string | null;
   outputBySession: Record<string, string[]>;
 

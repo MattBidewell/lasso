@@ -16,11 +16,11 @@ export function TailModal() {
   const modal = () => state.modal;
 
   // Local state for tail options
-  const [format, setFormat] = createSignal<Format>("pretty");
-  const [samplingRate, setSamplingRate] = createSignal(1);
-  const [filterOk, setFilterOk] = createSignal(true);
-  const [filterError, setFilterError] = createSignal(true);
-  const [filterCanceled, setFilterCanceled] = createSignal(true);
+  const [format, setFormat] = createSignal<Format | null>(null);
+  const [samplingRate, setSamplingRate] = createSignal<number | null>(null);
+  const [filterOk, setFilterOk] = createSignal(false);
+  const [filterError, setFilterError] = createSignal(false);
+  const [filterCanceled, setFilterCanceled] = createSignal(false);
   
   // HTTP Methods (7 toggles)
   const [methodGet, setMethodGet] = createSignal(false);
@@ -82,8 +82,8 @@ export function TailModal() {
       case "y":
       case "return": {
         const options: TailOptions = {
-          format: format(),
-          samplingRate: samplingRate(),
+          format: format() ?? undefined,
+          samplingRate: samplingRate() ?? undefined,
           status: getStatusFilters(),
           methods: getHttpMethods(),
           search: search() || undefined,
@@ -124,13 +124,19 @@ export function TailModal() {
       }
       case "left": {
         if (focusedField() === 1) {
-          setSamplingRate((r) => Math.max(0.1, Math.round((r - 0.1) * 10) / 10));
+          setSamplingRate((r) => {
+            if (r === null) return 0.1;
+            return Math.max(0.1, Math.round((r - 0.1) * 10) / 10);
+          });
         }
         break;
       }
       case "right": {
         if (focusedField() === 1) {
-          setSamplingRate((r) => Math.min(1, Math.round((r + 0.1) * 10) / 10));
+          setSamplingRate((r) => {
+            if (r === null) return 0.1;
+            return Math.min(1, Math.round((r + 0.1) * 10) / 10);
+          });
         }
         break;
       }
@@ -184,13 +190,20 @@ export function TailModal() {
     { id: "versionId", label: "Version ID", get: versionId, set: setVersionId },
   ];
 
+  const formatDisplay = () => format() ?? "(unset)";
+  const samplingDisplay = () => {
+    const value = samplingRate();
+    if (value === null) return "(unset)";
+    return `${(value * 100).toFixed(0)}%`;
+  };
+
   return (
     <box
       position="absolute"
       top="15%"
-      left="20%"
-      width={60}
-      height={24}
+      left="15%"
+      width="70%"
+      height="70%"
       border={true}
       borderStyle="rounded"
       borderColor={COLORS.activeBorder}
@@ -203,15 +216,18 @@ export function TailModal() {
       
       {/* Format field - index 0 */}
       <text fg={focusedField() === 0 ? COLORS.selected : COLORS.normal}>
-        <Show when={focusedField() === 0} fallback={<span>{"  "}Format: {format()}</span>}>
-          <strong>{"  "}Format: {format()}</strong>
+        <Show when={focusedField() === 0} fallback={<span>{"  "}Format: {formatDisplay()}</span>}>
+          <strong>{"  "}Format: {formatDisplay()}</strong>
         </Show>
       </text>
       
       {/* Sampling rate field - index 1 */}
       <text fg={focusedField() === 1 ? COLORS.selected : COLORS.normal}>
-        <Show when={focusedField() === 1} fallback={<span>{"  "}Sampling: {(samplingRate() * 100).toFixed(0)}%</span>}>
-          <strong>{"  "}Sampling: {(samplingRate() * 100).toFixed(0)}%</strong>
+        <Show
+          when={focusedField() === 1}
+          fallback={<span>{"  "}Sampling: {samplingDisplay()}</span>}
+        >
+          <strong>{"  "}Sampling: {samplingDisplay()}</strong>
         </Show>
       </text>
       <text> </text>

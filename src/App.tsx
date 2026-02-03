@@ -17,6 +17,7 @@ import { BindingsPanel } from "./components/panels/BindingsPanel.tsx";
 import { ActionsPanel } from "./components/panels/ActionsPanel.tsx";
 import { AboutPanel } from "./components/panels/AboutPanel.tsx";
 import { OutputPanel } from "./components/panels/OutputPanel.tsx";
+import { TerminalHistoryPanel } from "./components/panels/TerminalHistoryPanel.tsx";
 
 // Modals
 import { DeployModal } from "./components/modals/DeployModal.tsx";
@@ -80,6 +81,9 @@ export function App() {
       case "5":
         setFocusedPanel("output");
         break;
+      case "6":
+        setFocusedPanel("history");
+        break;
       case "o":
         openInEditor();
         break;
@@ -97,9 +101,14 @@ export function App() {
         </box>
 
         <box flexDirection="column" width="67%" height="100%">
-          <Show when={state.activeSessionId} fallback={<AboutPanel />}>
-            <OutputPanel />
-          </Show>
+          <box height="70%">
+            <Show when={state.activeSessionId} fallback={<AboutPanel />}>
+              <OutputPanel />
+            </Show>
+          </box>
+          <box height="30%">
+            <TerminalHistoryPanel />
+          </box>
         </box>
       </box>
 

@@ -18,7 +18,7 @@ export function DeployModal() {
 
   // Local state for deploy options
   const [dryRun, setDryRun] = createSignal(false);
-  const [minify, setMinify] = createSignal(true);
+  const [minify, setMinify] = createSignal(false);
   const [keepVars, setKeepVars] = createSignal(false);
   const [noBundle, setNoBundle] = createSignal(false);
   const [uploadSourceMaps, setUploadSourceMaps] = createSignal(false);
@@ -174,10 +174,10 @@ export function DeployModal() {
   return (
     <box
       position="absolute"
-      top="30%"
-      left="25%"
-      width={50}
-      height={16}
+      top="15%"
+      left="15%"
+      width="70%"
+      height="70%"
       border={true}
       borderStyle="rounded"
       borderColor={COLORS.activeBorder}

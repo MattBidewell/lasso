@@ -20,6 +20,7 @@ function createInitialState(cwd: string): AppState {
     // Sessions and output
     sessions: [],
     selectedActionIndex: 0,
+    selectedHistoryIndex: 0,
     activeSessionId: null,
     outputBySession: {},
 
@@ -77,7 +78,7 @@ export function setFocusedPanel(panel: Panel): void {
 }
 
 export function cycleFocus(direction: "forward" | "backward" = "forward"): void {
-  const panels: Panel[] = ["configs", "environments", "bindings", "actions", "output"];
+  const panels: Panel[] = ["configs", "environments", "bindings", "actions", "output", "history"];
   const currentIndex = panels.indexOf(state.focusedPanel);
   const nextIndex = direction === "forward"
     ? (currentIndex + 1) % panels.length
@@ -233,6 +234,10 @@ export function removeSession(sessionId: string): void {
     setState("activeSessionId", remaining.length > 0 ? remaining[0]!.id : null);
   }
 
+  if (state.selectedHistoryIndex >= state.sessions.length) {
+    setState("selectedHistoryIndex", Math.max(0, state.sessions.length - 1));
+  }
+
   // Clean up output buffer
   const { [sessionId]: _, ...rest } = state.outputBySession;
   setState("outputBySession", rest);
@@ -267,6 +272,15 @@ export function getSelectedSession(): Session | undefined {
 
 export function getActiveSession(): Session | undefined {
   return state.sessions.find((s) => s.id === state.activeSessionId);
+}
+
+export function selectHistory(index: number): void {
+  const clamped = Math.max(0, Math.min(index, state.sessions.length - 1));
+  setState("selectedHistoryIndex", clamped);
+}
+
+export function getSelectedHistory(): Session | undefined {
+  return state.sessions[state.selectedHistoryIndex];
 }
 
 export function hasActiveSession(configPath: string, environment: string, action: SessionAction): boolean {
