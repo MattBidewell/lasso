@@ -8,15 +8,15 @@ export function StatusBar() {
 
     switch (state.focusedPanel) {
       case "configs":
-        return [...base, "j/k:nav", "Enter:select", "/:search"];
+        return [...base, "j/k:nav"];
       case "environments":
-        return [...base, "j/k:nav", "Enter:dev", "d:deploy", "t:tail", "b:back"];
+        return [...base, "j/k:nav"];
       case "bindings":
         return [...base, "j/k:nav"];
       case "sessions":
-        return [...base, "j/k:nav", "Enter:view", "x:stop", "d:remove"];
+        return [...base, "j/k:nav", "Enter:start", "x:stop", "d:remove"];
       case "output":
-        return [...base, "c:clear", "b:back"];
+        return [...base, "c:clear"];
       default:
         return base;
     }

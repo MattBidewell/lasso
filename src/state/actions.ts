@@ -101,47 +101,6 @@ export function showHelpModal(): void {
   openModal({ type: "help" });
 }
 
-// ============ Navigation Shortcuts ============
-
-export function handleEnter(): void {
-  const session = getSelectedSession();
-  if (session?.status === "running" && session.action === "dev") {
-    stopSession(session.id);
-  } else {
-    startDevSession();
-  }
-}
-
-export function handleDeployKey(): void {
-  const session = getSelectedSession();
-  if (session?.status === "running" && session.action === "deploy") {
-    stopSession(session.id);
-  } else {
-    showDeployModal();
-  }
-}
-
-export function handleTailKey(): void {
-  const session = getSelectedSession();
-  if (session?.status === "running" && session.action === "tail") {
-    stopSession(session.id);
-  } else {
-    showTailModal();
-  }
-}
-
-export function handleEscape(): void {
-  if (state.modal) {
-    closeModal();
-  } else {
-    const session = getSelectedSession();
-    if (session?.status === "running") {
-      stopSession(session.id);
-    }
-    setFocusedPanel("sessions");
-  }
-}
-
 // ============ Editor Actions ============
 
 export function openInEditor(): void {

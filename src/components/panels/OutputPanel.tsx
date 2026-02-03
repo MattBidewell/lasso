@@ -1,7 +1,7 @@
 import { createMemo, createSignal } from "solid-js";
 import type { ScrollBoxRenderable } from "@opentui/core";
 import { useKeyboard } from "@opentui/solid";
-import { state, setFocusedPanel, getActiveSession, clearSessionOutput } from "../../state/store.ts";
+import { state, getActiveSession, clearSessionOutput } from "../../state/store.ts";
 import { stopSession } from "../../state/actions.ts";
 import { COLORS } from "../../themes/index.ts";
 
@@ -124,24 +124,13 @@ export function OutputPanel() {
         }
         break;
       }
-      case "h":
-      case "left":
-      case "b":
-      case "escape": {
-        const sessionToStop = activeSession();
-        if (sessionToStop?.status === "running") {
-          stopSession(sessionToStop.id);
-        }
-        setFocusedPanel("sessions");
-        break;
-      }
     }
   });
 
   return (
     <scrollbox
       ref={scrollboxRef}
-      title={title()}
+      title="[5] Output"
       border={true}
       borderStyle="rounded"
       borderColor={isFocused() ? COLORS.activeBorder : COLORS.inactiveBorder}
@@ -152,7 +141,7 @@ export function OutputPanel() {
       stickyStart="bottom"
     >
       {output().length === 0 ? (
-        <text fg={COLORS.muted}>  No output yet. Select a session or press Enter to start dev.</text>
+        <text fg={COLORS.muted}>  No output yet. Select config, environment, and action (press 4).</text>
       ) : (
         <text fg={COLORS.normal}>{output().join("\n")}</text>
       )}

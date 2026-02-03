@@ -5,14 +5,21 @@ import {
   selectSession,
   activateSession,
   getSelectedSession,
+  getSelectedConfig,
+  getSelectedEnv,
+  getSession,
   setFocusedPanel,
 } from "../../state/store.ts";
 import {
+  startDevSession,
+  startTailSession,
+  startDeploySession,
   stopSession,
   removeSessionFromList,
 } from "../../state/actions.ts";
 import { COLORS } from "../../themes/index.ts";
-import type { SessionStatus } from "../../types.ts";
+import type { SessionAction, SessionStatus } from "../../types.ts";
+import { createSessionId } from "../../types.ts";
 
 const STATUS_ICONS: Record<SessionStatus, string> = {
   running: "●",
@@ -21,26 +28,84 @@ const STATUS_ICONS: Record<SessionStatus, string> = {
   failed: "✗",
 };
 
-const ACTION_LABELS: Record<string, string> = {
-  dev: "dev",
-  tail: "tail",
-  deploy: "deploy",
-};
+interface SessionItem {
+  id: string;
+  type: "action" | "session";
+  action: SessionAction;
+  displayName: string;
+  envDisplay: string;
+  status?: SessionStatus;
+  isActive?: boolean;
+}
 
 export function SessionsPanel() {
   const isFocused = () => state.focusedPanel === "sessions";
-  const sessions = () => state.sessions;
   const selectedIndex = () => state.selectedSessionIndex;
   const activeId = () => state.activeSessionId;
 
-  // Helper to select and activate a session (updates output window)
-  const selectAndActivate = (index: number) => {
-    selectSession(index);
-    // Get the session at the new index after selection
-    const newIndex = Math.max(0, Math.min(index, sessions().length - 1));
-    const session = sessions()[newIndex];
-    if (session) {
-      activateSession(session.id);
+  // Get all items (actions + sessions) for current config+env
+  const items = createMemo((): SessionItem[] => {
+    const config = getSelectedConfig();
+    const env = getSelectedEnv();
+
+    if (!config || !env) {
+      return [];
+    }
+
+    const result: SessionItem[] = [];
+    const actions: SessionAction[] = ["dev", "deploy", "tail"];
+
+    for (const action of actions) {
+      const sessionId = createSessionId(config.path, env, action);
+      const session = getSession(sessionId);
+
+      if (session) {
+        // Session exists - show it with status
+        result.push({
+          id: sessionId,
+          type: "session",
+          action,
+          displayName: config.name,
+          envDisplay: env,
+          status: session.status,
+          isActive: sessionId === activeId(),
+        });
+      } else {
+        // No session - show as available action (no icon)
+        result.push({
+          id: sessionId,
+          type: "action",
+          action,
+          displayName: config.name,
+          envDisplay: env,
+        });
+      }
+    }
+
+    return result;
+  });
+
+  const handleEnter = () => {
+    const item = items()[selectedIndex()];
+    if (!item) return;
+
+    if (item.type === "action") {
+      // Start the action
+      switch (item.action) {
+        case "dev":
+          startDevSession();
+          break;
+        case "deploy":
+          startDeploySession();
+          break;
+        case "tail":
+          startTailSession();
+          break;
+      }
+    } else if (item.type === "session") {
+      // Activate existing session and go to output
+      activateSession(item.id);
+      setFocusedPanel("output");
     }
   };
 
@@ -48,94 +113,50 @@ export function SessionsPanel() {
     if (!isFocused()) return;
     if (state.modal) return;
 
+    const itemCount = items().length;
+
     switch (event.name) {
       case "j":
       case "down":
-        selectAndActivate(selectedIndex() + 1);
+        selectSession(Math.min(selectedIndex() + 1, itemCount - 1));
         break;
       case "k":
       case "up":
-        selectAndActivate(selectedIndex() - 1);
+        selectSession(Math.max(selectedIndex() - 1, 0));
         break;
       case "g":
-        selectAndActivate(0);
+        selectSession(0);
         break;
       case "G":
-        selectAndActivate(sessions().length - 1);
+        selectSession(itemCount - 1);
         break;
       case "return":
-      case "l":
-      case "right":
-        // Activate selected session (show its output)
-        const selected = getSelectedSession();
-        if (selected) {
-          activateSession(selected.id);
-          setFocusedPanel("output");
+        handleEnter();
+        break;
+      case "x": {
+        // Stop selected session (only if it's a running session)
+        const item = items()[selectedIndex()];
+        if (item?.type === "session" && item.status === "running") {
+          stopSession(item.id);
         }
         break;
-      case "x":
-        // Stop selected session
-        const toStop = getSelectedSession();
-        if (toStop && toStop.status === "running") {
-          stopSession(toStop.id);
-        }
-        break;
+      }
       case "d":
       case "delete":
-      case "backspace":
+      case "backspace": {
         // Remove selected session (only if not running)
-        const toRemove = getSelectedSession();
-        if (toRemove && toRemove.status !== "running" && toRemove.status !== "stopping") {
-          removeSessionFromList(toRemove.id);
+        const item = items()[selectedIndex()];
+        if (item?.type === "session" && item.status !== "running" && item.status !== "stopping") {
+          removeSessionFromList(item.id);
         }
         break;
-      case "h":
-      case "left":
-      case "b":
-        setFocusedPanel("bindings");
-        break;
+      }
     }
   });
 
-  // Create display items
-  const items = createMemo(() =>
-    sessions().map((session, i) => {
-      const selected = i === selectedIndex();
-      const active = session.id === activeId();
-      const prefix = selected ? "> " : "  ";
-      const icon = STATUS_ICONS[session.status];
-      const actionLabel = ACTION_LABELS[session.action];
-
-      // Truncate display name if too long (leave room for env, action, icon)
-      const maxNameLen = 10;
-      const displayName =
-        session.displayName.length > maxNameLen
-          ? session.displayName.slice(0, maxNameLen - 1) + "…"
-          : session.displayName;
-
-      // Truncate environment if needed
-      const maxEnvLen = 6;
-      const envDisplay =
-        session.environment.length > maxEnvLen
-          ? session.environment.slice(0, maxEnvLen - 1) + "…"
-          : session.environment;
-
-      return {
-        session,
-        prefix,
-        selected,
-        active,
-        icon,
-        actionLabel,
-        displayName,
-        envDisplay,
-      };
-    })
-  );
-
   return (
     <scrollbox
-      title="Sessions"
+      title="[4] Sessions"
       border={true}
       borderStyle="rounded"
       borderColor={isFocused() ? COLORS.activeBorder : COLORS.inactiveBorder}
@@ -144,26 +165,32 @@ export function SessionsPanel() {
       focused={isFocused()}
     >
       <Show when={items().length === 0}>
-        <text fg={COLORS.muted}> No active sessions</text>
+        <text fg={COLORS.muted}> Select a config and environment first</text>
       </Show>
       <For each={items()}>
-        {(item) => {
-          const content = `${item.prefix}${item.displayName} [${item.envDisplay}] ${item.actionLabel} ${item.icon}`;
+        {(item, i) => {
+          const selected = i() === selectedIndex();
+          const prefix = selected ? "> " : "  ";
 
-          // Determine color based on state
-          const color = item.active
+          // Format: [icon] name [env] action
+          // Actions have no icon, sessions have status icon
+          const icon = item.type === "session" && item.status ? STATUS_ICONS[item.status] : " ";
+          const content = `${prefix}${icon} ${item.displayName} [${item.envDisplay}] ${item.action}`;
+
+          // Determine color
+          const color = item.isActive
             ? COLORS.accent
-            : item.selected
+            : selected
               ? COLORS.selected
-              : item.session.status === "failed"
+              : item.type === "session" && item.status === "failed"
                 ? COLORS.error
-                : item.session.status === "completed"
+                : item.type === "session" && item.status === "completed"
                   ? COLORS.success
                   : COLORS.normal;
 
           return (
             <text fg={color}>
-              <Show when={item.selected} fallback={<span>{content}</span>}>
+              <Show when={selected} fallback={<span>{content}</span>}>
                 <strong>{content}</strong>
               </Show>
             </text>

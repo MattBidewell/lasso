@@ -39,27 +39,28 @@ export function HelpModal() {
       <text fg={COLORS.normal}>    ?             Toggle help</text>
       <text fg={COLORS.normal}>    Tab           Cycle panels forward</text>
       <text fg={COLORS.normal}>    Shift+Tab     Cycle panels backward</text>
-      <text fg={COLORS.normal}>    1-6           Jump to panel</text>
+      <text fg={COLORS.normal}>    1-5           Jump to panel</text>
+      <text> </text>
+      <text fg={COLORS.normal}><strong>  Panels</strong></text>
+      <text fg={COLORS.normal}>    [1] Configs       Select a config</text>
+      <text fg={COLORS.normal}>    [2] Environments  Select an environment</text>
+      <text fg={COLORS.normal}>    [3] Bindings      View bindings</text>
+      <text fg={COLORS.normal}>    [4] Sessions      Start dev/deploy/tail</text>
+      <text fg={COLORS.normal}>    [5] Output        View session output</text>
       <text> </text>
       <text fg={COLORS.normal}><strong>  Navigation</strong></text>
       <text fg={COLORS.normal}>    j/k or arrows Move up/down</text>
       <text fg={COLORS.normal}>    g/G           Go to top/bottom</text>
       <text fg={COLORS.normal}>    Ctrl+D/U      Page down/up</text>
       <text> </text>
-      <text fg={COLORS.normal}><strong>  Actions (Environments)</strong></text>
-      <text fg={COLORS.normal}>    Enter         Start dev server</text>
-      <text fg={COLORS.normal}>    d             Deploy worker</text>
-      <text fg={COLORS.normal}>    t             Tail logs</text>
-      <text fg={COLORS.normal}>    o             Open config in $EDITOR</text>
-      <text> </text>
       <text fg={COLORS.normal}><strong>  Sessions Panel</strong></text>
-      <text fg={COLORS.normal}>    Enter         View session output</text>
+      <text fg={COLORS.normal}>    Enter         Start action or view output</text>
       <text fg={COLORS.normal}>    x             Stop running session</text>
       <text fg={COLORS.normal}>    d             Remove stopped session</text>
       <text> </text>
-      <text fg={COLORS.normal}><strong>  Output/Logs</strong></text>
+      <text fg={COLORS.normal}><strong>  Output Panel</strong></text>
       <text fg={COLORS.normal}>    c             Clear output</text>
-      <text fg={COLORS.normal}>    Esc/b         Go back</text>
+      <text fg={COLORS.normal}>    Ctrl+C        Stop running session</text>
       <text> </text>
       <text fg={COLORS.muted}>  Press Esc or ? to close</text>
     </box>

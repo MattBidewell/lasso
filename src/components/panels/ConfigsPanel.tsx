@@ -1,6 +1,6 @@
 import { For, createMemo, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { state, selectConfig, getFilteredConfigs, setFocusedPanel } from "../../state/store.ts";
+import { state, selectConfig, getFilteredConfigs } from "../../state/store.ts";
 import { COLORS } from "../../themes/index.ts";
 
 export function ConfigsPanel() {
@@ -34,12 +34,6 @@ export function ConfigsPanel() {
       case "ctrl-u":
         selectConfig(selectedIndex() - PAGE_SIZE);
         break;
-      case "l":
-      case "right":
-      case "return":
-        // Navigate to environments panel
-        setFocusedPanel("environments");
-        break;
     }
   });
 
@@ -60,7 +54,7 @@ export function ConfigsPanel() {
 
   return (
     <scrollbox
-      title="Configs"
+      title="[1] Configs"
       border={true}
       borderStyle="rounded"
       borderColor={isFocused() ? COLORS.activeBorder : COLORS.inactiveBorder}

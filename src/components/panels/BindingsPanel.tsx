@@ -56,7 +56,7 @@ export function BindingsPanel() {
 
   return (
     <scrollbox
-      title="Bindings"
+      title="[3] Bindings"
       border={true}
       borderStyle="rounded"
       borderColor={isFocused() ? COLORS.activeBorder : COLORS.inactiveBorder}

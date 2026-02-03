@@ -1,7 +1,6 @@
 import { For, createMemo, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { state, selectEnv, getSelectedConfig, getSelectedEnv, setFocusedPanel, openModal, hasActiveSession } from "../../state/store.ts";
-import { startDevSession } from "../../state/actions.ts";
+import { state, selectEnv, getSelectedConfig, hasActiveSession } from "../../state/store.ts";
 import { COLORS } from "../../themes/index.ts";
 
 export function EnvironmentsPanel() {
@@ -39,43 +38,6 @@ export function EnvironmentsPanel() {
       case "ctrl-u":
         selectEnv(selectedEnvIndex() - PAGE_SIZE);
         break;
-      case "h":
-      case "left":
-      case "b":
-      case "escape":
-        // Go back to configs panel
-        setFocusedPanel("configs");
-        break;
-
-      // ACTION KEYS
-      case "return":
-        // Start dev server session
-        startDevSession();
-        break;
-      case "d": {
-        // Open deploy modal
-        const configD = getSelectedConfig();
-        if (configD) {
-          openModal({
-            type: "deploy",
-            configName: configD.name,
-            environment: getSelectedEnv(),
-          });
-        }
-        break;
-      }
-      case "t": {
-        // Open tail modal
-        const configT = getSelectedConfig();
-        if (configT) {
-          openModal({
-            type: "tail",
-            configName: configT.name,
-            environment: getSelectedEnv(),
-          });
-        }
-        break;
-      }
     }
   });
 
@@ -100,7 +62,7 @@ export function EnvironmentsPanel() {
 
   return (
     <scrollbox
-      title="Environments"
+      title="[2] Environments"
       border={true}
       borderStyle="rounded"
       borderColor={isFocused() ? COLORS.activeBorder : COLORS.inactiveBorder}

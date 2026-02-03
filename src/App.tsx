@@ -2,7 +2,7 @@ import { Show, onMount } from "solid-js";
 import { useKeyboard, useRenderer } from "@opentui/solid";
 import { state, cycleFocus, setFocusedPanel, getSelectedSession } from "./state/store.ts";
 import {
-  handleEscape,
+  closeModal,
   showHelpModal,
   openInEditor,
   stopSession,
@@ -31,6 +31,15 @@ export function App() {
   });
 
   useKeyboard((event) => {
+    // Handle escape first - only closes modals
+    if (event.name === "escape") {
+      if (state.modal) {
+        closeModal();
+      }
+      return;
+    }
+
+    // Modal takes priority for other keys
     if (state.modal) return;
 
     if (event.ctrl && event.name === "c") {
@@ -52,10 +61,6 @@ export function App() {
         break;
       case "shift-tab":
         cycleFocus("backward");
-        break;
-      case "escape":
-      case "b":
-        handleEscape();
         break;
       case "?":
         showHelpModal();
