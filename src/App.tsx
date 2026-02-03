@@ -14,7 +14,7 @@ import {
 import { ConfigsPanel } from "./components/panels/ConfigsPanel.tsx";
 import { EnvironmentsPanel } from "./components/panels/EnvironmentsPanel.tsx";
 import { BindingsPanel } from "./components/panels/BindingsPanel.tsx";
-import { SessionsPanel } from "./components/panels/SessionsPanel.tsx";
+import { ActionsPanel } from "./components/panels/ActionsPanel.tsx";
 import { AboutPanel } from "./components/panels/AboutPanel.tsx";
 import { OutputPanel } from "./components/panels/OutputPanel.tsx";
 
@@ -75,7 +75,7 @@ export function App() {
         setFocusedPanel("bindings");
         break;
       case "4":
-        setFocusedPanel("sessions");
+        setFocusedPanel("actions");
         break;
       case "5":
         setFocusedPanel("output");
@@ -93,7 +93,7 @@ export function App() {
           <ConfigsPanel />
           <EnvironmentsPanel />
           <BindingsPanel />
-          <SessionsPanel />
+          <ActionsPanel />
         </box>
 
         <box flexDirection="column" width="67%" height="100%">

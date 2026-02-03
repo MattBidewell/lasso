@@ -98,7 +98,15 @@ export function OutputPanel() {
       case "down":
         scrollBy(1);
         break;
-      case "k":
+      case "k": {
+        const sessionToStop = activeSession();
+        if (sessionToStop?.status === "running") {
+          stopSession(sessionToStop.id);
+        } else {
+          scrollBy(-1);
+        }
+        break;
+      }
       case "up":
         scrollBy(-1);
         break;

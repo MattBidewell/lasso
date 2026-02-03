@@ -19,7 +19,7 @@ function createInitialState(cwd: string): AppState {
 
     // Sessions and output
     sessions: [],
-    selectedSessionIndex: 0,
+    selectedActionIndex: 0,
     activeSessionId: null,
     outputBySession: {},
 
@@ -77,7 +77,7 @@ export function setFocusedPanel(panel: Panel): void {
 }
 
 export function cycleFocus(direction: "forward" | "backward" = "forward"): void {
-  const panels: Panel[] = ["configs", "environments", "bindings", "sessions", "output"];
+  const panels: Panel[] = ["configs", "environments", "bindings", "actions", "output"];
   const currentIndex = panels.indexOf(state.focusedPanel);
   const nextIndex = direction === "forward"
     ? (currentIndex + 1) % panels.length
@@ -212,7 +212,6 @@ export function getBindings(): NormalizedBinding[] {
 
 export function addSession(session: Session): void {
   setState("sessions", (sessions) => [...sessions, session]);
-  setState("selectedSessionIndex", state.sessions.length);
   setState("activeSessionId", session.id);
 }
 
@@ -229,10 +228,6 @@ export function removeSession(sessionId: string): void {
 
   setState("sessions", (sessions) => sessions.filter((s) => s.id !== sessionId));
 
-  if (state.selectedSessionIndex >= state.sessions.length) {
-    setState("selectedSessionIndex", Math.max(0, state.sessions.length - 1));
-  }
-
   if (state.activeSessionId === sessionId) {
     const remaining = state.sessions;
     setState("activeSessionId", remaining.length > 0 ? remaining[0]!.id : null);
@@ -243,9 +238,9 @@ export function removeSession(sessionId: string): void {
   setState("outputBySession", rest);
 }
 
-export function selectSession(index: number): void {
-  const clamped = Math.max(0, Math.min(index, state.sessions.length - 1));
-  setState("selectedSessionIndex", clamped);
+export function selectAction(index: number): void {
+  const clamped = Math.max(0, Math.min(index, 2)); // 3 actions: dev, deploy, tail
+  setState("selectedActionIndex", clamped);
 }
 
 export function activateSession(sessionId: string): void {
@@ -257,7 +252,17 @@ export function getSession(sessionId: string): Session | undefined {
 }
 
 export function getSelectedSession(): Session | undefined {
-  return state.sessions[state.selectedSessionIndex];
+  // Get session based on selected action
+  const config = getSelectedConfig();
+  const env = getSelectedEnv();
+  if (!config || !env) return undefined;
+  
+  const actions: SessionAction[] = ["dev", "deploy", "tail"];
+  const action = actions[state.selectedActionIndex];
+  if (!action) return undefined;
+  
+  const sessionId = createSessionId(config.path, env, action);
+  return getSession(sessionId);
 }
 
 export function getActiveSession(): Session | undefined {

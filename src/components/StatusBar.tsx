@@ -13,8 +13,8 @@ export function StatusBar() {
         return [...base, "j/k:nav"];
       case "bindings":
         return [...base, "j/k:nav"];
-      case "sessions":
-        return [...base, "j/k:nav", "Enter:start", "x:stop", "d:remove"];
+      case "actions":
+        return [...base, "j/k:nav", "Enter:start", "x:stop"];
       case "output":
         return [...base, "c:clear"];
       default:
