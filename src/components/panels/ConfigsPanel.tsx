@@ -1,6 +1,6 @@
 import { For, createMemo, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { state, selectConfig, getFilteredConfigs } from "../../state/store.ts";
+import { state, selectConfig, getFilteredConfigs, setFocusedPanel } from "../../state/store.ts";
 import { COLORS } from "../../themes/index.ts";
 
 export function ConfigsPanel() {
@@ -12,7 +12,9 @@ export function ConfigsPanel() {
     if (!isFocused()) return;
     if (state.modal) return;
 
-    const PAGE_SIZE = 5;
+    const isTop = event.name === "g" && !event.shift;
+    const isBottom = (event.name === "G") || (event.name === "g" && event.shift);
+
     switch (event.name) {
       case "j":
       case "down":
@@ -23,16 +25,14 @@ export function ConfigsPanel() {
         selectConfig(selectedIndex() - 1);
         break;
       case "g":
-        selectConfig(0);
+        if (event.shift) {
+          selectConfig(configs().length - 1);
+        } else {
+          selectConfig(0);
+        }
         break;
       case "G":
         selectConfig(configs().length - 1);
-        break;
-      case "ctrl-d":
-        selectConfig(selectedIndex() + PAGE_SIZE);
-        break;
-      case "ctrl-u":
-        selectConfig(selectedIndex() - PAGE_SIZE);
         break;
     }
   });
@@ -41,12 +41,14 @@ export function ConfigsPanel() {
   const items = createMemo(() =>
     configs().map((config, i) => {
       const selected = i === selectedIndex();
-      const prefix = selected ? "> " : "  ";
+      const active = isFocused() && selected;
+      const prefix = active ? "> " : "  ";
 
       return {
         name: config.name,
         prefix,
         selected,
+        active,
         hasError: !!config.error,
       };
     })
@@ -61,14 +63,15 @@ export function ConfigsPanel() {
       focusedBorderColor={COLORS.activeBorder}
       flexGrow={1}
       focused={isFocused()}
+      onMouseDown={() => setFocusedPanel("configs")}
     >
       <Show when={items().length === 0}>
         <text fg={COLORS.muted}>  No configs found</text>
       </Show>
       <For each={items()}>
         {(item) => (
-          <text fg={item.hasError ? COLORS.error : item.selected ? COLORS.selected : COLORS.normal}>
-            <Show when={item.selected} fallback={<span>{item.prefix}{item.name}</span>}>
+          <text fg={item.hasError ? COLORS.error : item.active ? COLORS.selected : COLORS.normal}>
+            <Show when={item.active} fallback={<span>{item.prefix}{item.name}</span>}>
               <strong>{item.prefix}{item.name}</strong>
             </Show>
           </text>

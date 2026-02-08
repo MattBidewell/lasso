@@ -1,6 +1,6 @@
 import { For, createMemo, Show } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { state, selectEnv, getSelectedConfig, hasActiveSession } from "../../state/store.ts";
+import { state, selectEnv, getSelectedConfig, hasActiveSession, setFocusedPanel } from "../../state/store.ts";
 import { COLORS } from "../../themes/index.ts";
 
 export function EnvironmentsPanel() {
@@ -16,7 +16,9 @@ export function EnvironmentsPanel() {
     if (!isFocused()) return;
     if (state.modal) return;
 
-    const PAGE_SIZE = 5;
+    const isTop = event.name === "g" && !event.shift;
+    const isBottom = (event.name === "G") || (event.name === "g" && event.shift);
+
     switch (event.name) {
       case "j":
       case "down":
@@ -27,16 +29,14 @@ export function EnvironmentsPanel() {
         selectEnv(selectedEnvIndex() - 1);
         break;
       case "g":
-        selectEnv(0);
+        if (event.shift) {
+          selectEnv(environments().length - 1);
+        } else {
+          selectEnv(0);
+        }
         break;
       case "G":
         selectEnv(environments().length - 1);
-        break;
-      case "ctrl-d":
-        selectEnv(selectedEnvIndex() + PAGE_SIZE);
-        break;
-      case "ctrl-u":
-        selectEnv(selectedEnvIndex() - PAGE_SIZE);
         break;
     }
   });
@@ -45,7 +45,8 @@ export function EnvironmentsPanel() {
   const items = createMemo(() =>
     environments().map((env, i) => {
       const selected = i === selectedEnvIndex();
-      const prefix = selected ? "> " : "  ";
+      const active = isFocused() && selected;
+      const prefix = active ? "> " : "  ";
 
       // Check if this env has an active session
       const config = getSelectedConfig();
@@ -55,6 +56,7 @@ export function EnvironmentsPanel() {
         name: env,
         prefix,
         selected,
+        active,
         isActive,
       };
     })
@@ -69,14 +71,15 @@ export function EnvironmentsPanel() {
       focusedBorderColor={COLORS.activeBorder}
       flexGrow={1}
       focused={isFocused()}
+      onMouseDown={() => setFocusedPanel("environments")}
     >
       <Show when={items().length === 0}>
         <text fg={COLORS.muted}>  No environments</text>
       </Show>
       <For each={items()}>
         {(item) => (
-          <text fg={item.selected ? COLORS.selected : COLORS.normal}>
-            <Show when={item.selected} fallback={<span>{item.prefix}{item.name}{item.isActive ? " ●" : ""}</span>}>
+          <text fg={item.active ? COLORS.selected : COLORS.normal}>
+            <Show when={item.active} fallback={<span>{item.prefix}{item.name}{item.isActive ? " ●" : ""}</span>}>
               <strong>{item.prefix}{item.name}{item.isActive ? " ●" : ""}</strong>
             </Show>
           </text>

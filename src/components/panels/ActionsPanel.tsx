@@ -142,7 +142,11 @@ export function ActionsPanel() {
         previewAction(Math.max(selectedIndex() - 1, 0));
         break;
       case "g":
-        previewAction(0);
+        if (event.shift) {
+          previewAction(itemCount - 1);
+        } else {
+          previewAction(0);
+        }
         break;
       case "G":
         previewAction(itemCount - 1);
@@ -162,6 +166,7 @@ export function ActionsPanel() {
         break;
       }
     }
+
   });
 
   return (
@@ -173,6 +178,7 @@ export function ActionsPanel() {
       focusedBorderColor={COLORS.activeBorder}
       flexGrow={1}
       focused={isFocused()}
+      onMouseDown={() => setFocusedPanel("actions")}
     >
       <Show when={items().length === 0}>
         <text fg={COLORS.muted}> Select a config and environment first</text>
@@ -181,7 +187,8 @@ export function ActionsPanel() {
         {(item, i) => {
           // Create a reactive signal for whether this item is selected
           const isSelected = createMemo(() => i() === selectedIndex());
-          const prefix = createMemo(() => isSelected() ? "> " : "  ");
+          const isActive = createMemo(() => isFocused() && isSelected());
+          const prefix = createMemo(() => isActive() ? "> " : "  ");
 
           // Show icon only if running, otherwise space
           const icon = item.status ? STATUS_ICONS[item.status] : " ";
@@ -189,18 +196,18 @@ export function ActionsPanel() {
 
           // Color based on status - must be reactive
           const color = createMemo(() =>
-            isSelected()
+            isActive()
               ? COLORS.selected
               : item.status === "failed"
                 ? COLORS.error
-              : item.status === "running"
-                ? COLORS.accent
-                : COLORS.normal
+                : item.status === "running"
+                  ? COLORS.accent
+                  : COLORS.normal
           );
 
           return (
             <text fg={color()}>
-              <Show when={isSelected()} fallback={<span>{content()}</span>}>
+              <Show when={isActive()} fallback={<span>{content()}</span>}>
                 <strong>{content()}</strong>
               </Show>
             </text>

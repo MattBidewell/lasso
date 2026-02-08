@@ -1,5 +1,5 @@
 import { COLORS } from "../../themes/index.ts";
-import { state } from "../../state/store.ts";
+import { state, setFocusedPanel } from "../../state/store.ts";
 
 export function BindingsPanel() {
   const isFocused = () => state.focusedPanel === "bindings";
@@ -63,6 +63,7 @@ export function BindingsPanel() {
       focusedBorderColor={COLORS.activeBorder}
       flexGrow={1}
       focused={isFocused()}
+      onMouseDown={() => setFocusedPanel("bindings")}
     >
       {renderContent()}
     </scrollbox>

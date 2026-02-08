@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { Runner, type RunnerCallbacks } from "../core/runner/index.ts";
 import { parseAnsiLine } from "../core/ansi.ts";
 import type { DeployOptions, TailOptions, SessionAction } from "../types.ts";
@@ -99,22 +98,6 @@ export function showTailModal(): void {
 
 export function showHelpModal(): void {
   openModal({ type: "help" });
-}
-
-// ============ Editor Actions ============
-
-export function openInEditor(): void {
-  const config = getSelectedConfig();
-  if (!config) return;
-
-  const editor = process.env.EDITOR || process.env.VISUAL || "vi";
-
-  const child = spawn(editor, [config.path], {
-    stdio: "inherit",
-    detached: true,
-  });
-
-  child.unref();
 }
 
 // ============ Session Actions ============

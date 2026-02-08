@@ -119,7 +119,7 @@ export class Runner {
     childProcess.stdout?.on("data", (data: Buffer) => {
       const lines = data.toString().split("\n").filter(Boolean);
       for (const line of lines) {
-        this.callbacks.onSessionOutput(sessionId, executionId, line);
+        this.callbacks.onSessionOutput(sessionId, executionId, `[stdout] ${line}`);
       }
       this.callbacks.onRender();
     });
@@ -127,7 +127,7 @@ export class Runner {
     childProcess.stderr?.on("data", (data: Buffer) => {
       const lines = data.toString().split("\n").filter(Boolean);
       for (const line of lines) {
-        this.callbacks.onSessionOutput(sessionId, executionId, line);
+        this.callbacks.onSessionOutput(sessionId, executionId, `[stderr] ${line}`);
       }
       this.callbacks.onRender();
     });

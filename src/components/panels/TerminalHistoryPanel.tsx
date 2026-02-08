@@ -89,7 +89,11 @@ export function TerminalHistoryPanel() {
         previewHistory(Math.max(selectedIndex() - 1, 0));
         break;
       case "g":
-        previewHistory(0);
+        if (event.shift) {
+          previewHistory(itemCount - 1);
+        } else {
+          previewHistory(0);
+        }
         break;
       case "G":
         previewHistory(itemCount - 1);
@@ -103,6 +107,7 @@ export function TerminalHistoryPanel() {
         break;
       }
     }
+
   });
 
   return (
@@ -115,6 +120,7 @@ export function TerminalHistoryPanel() {
       height="100%"
       flexGrow={0}
       focused={isFocused()}
+      onMouseDown={() => setFocusedPanel("history")}
     >
       <Show when={history().length === 0}>
         <text fg={COLORS.muted}> No commands run yet</text>
@@ -122,7 +128,8 @@ export function TerminalHistoryPanel() {
       <For each={history()}>
         {(entry, i) => {
           const selected = createMemo(() => i() === selectedIndex());
-          const prefix = createMemo(() => selected() ? "> " : "  ");
+          const active = createMemo(() => isFocused() && selected());
+          const prefix = createMemo(() => active() ? "> " : "  ");
           const time = formatTime(entry.timestamp);
           const icon = getStatusIcon(entry.status);
           const shortId = entry.id.slice(-6);
@@ -133,7 +140,7 @@ export function TerminalHistoryPanel() {
           const commandLine = createMemo(() => `  ${entry.command}`);
 
           const color = createMemo(() =>
-            selected()
+            active()
               ? COLORS.selected
               : entry.status === "failed"
                 ? COLORS.error
@@ -144,7 +151,7 @@ export function TerminalHistoryPanel() {
 
           return (
             <Show
-              when={selected()}
+              when={active()}
               fallback={
                 <text fg={color()}>
                   <span>{content()}</span>

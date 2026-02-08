@@ -1,6 +1,6 @@
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { state, getActiveExecution, getActiveSession, clearExecutionOutput } from "../../state/store.ts";
+import { state, getActiveExecution, getActiveSession, clearExecutionOutput, setFocusedPanel } from "../../state/store.ts";
 import { stopSession } from "../../state/actions.ts";
 import { COLORS } from "../../themes/index.ts";
 import type { OutputSegment } from "../../types.ts";
@@ -120,19 +120,14 @@ export function OutputPanel() {
         scrollBy(-1);
         break;
       case "g":
-        scrollToTop();
+        if (event.shift) {
+          scrollToBottom();
+        } else {
+          scrollToTop();
+        }
         break;
       case "G":
         scrollToBottom();
-        break;
-      case "ctrl-d":
-        scrollBy(PAGE_SIZE);
-        break;
-      case "ctrl-u":
-        scrollBy(-PAGE_SIZE);
-        break;
-      case "c":
-        handleClear();
         break;
       case "x": {
         const sessionToStop = activeSession();
@@ -149,6 +144,7 @@ export function OutputPanel() {
         break;
       }
     }
+
   });
 
   const renderSegment = (segment: OutputSegment) => {
@@ -181,6 +177,7 @@ export function OutputPanel() {
       focused={isFocused()}
       stickyScroll={isSticky()}
       stickyStart="bottom"
+      onMouseDown={() => setFocusedPanel("output")}
     >
       <Show
         when={output().length > 0}

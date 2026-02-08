@@ -149,6 +149,7 @@ export interface AppState {
   focusedPanel: Panel;
   modal: ModalState | null;
   ansiEnabled: boolean;
+  toastMessage: string | null;
 
   // Executions and output
   executions: Execution[];

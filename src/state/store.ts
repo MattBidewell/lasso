@@ -28,6 +28,7 @@ function createInitialState(cwd: string): AppState {
     focusedPanel: "configs",
     modal: null,
     ansiEnabled: true,
+    toastMessage: null,
 
     // Executions and output
     executions: [],
@@ -116,6 +117,10 @@ export function closeModal(): void {
 
 export function setStatusMessage(message: string | null): void {
   setState("statusMessage", message);
+}
+
+export function setToastMessage(message: string | null): void {
+  setState("toastMessage", message);
 }
 
 export function setAnsiEnabled(enabled: boolean): void {

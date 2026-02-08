@@ -1,10 +1,10 @@
 import { Show, onMount } from "solid-js";
-import { useKeyboard, useRenderer } from "@opentui/solid";
-import { state, cycleFocus, setFocusedPanel, getSelectedSession } from "./state/store.ts";
+import { useKeyboard, useRenderer, useSelectionHandler } from "@opentui/solid";
+import { state, cycleFocus, setFocusedPanel, getSelectedSession, setToastMessage } from "./state/store.ts";
+import { copyToClipboard } from "./core/clipboard.ts";
 import {
   closeModal,
   showHelpModal,
-  openInEditor,
   stopSession,
   setRenderer,
   exitApp,
@@ -18,6 +18,7 @@ import { ActionsPanel } from "./components/panels/ActionsPanel.tsx";
 import { AboutPanel } from "./components/panels/AboutPanel.tsx";
 import { OutputPanel } from "./components/panels/OutputPanel.tsx";
 import { TerminalHistoryPanel } from "./components/panels/TerminalHistoryPanel.tsx";
+import { Toast } from "./components/Toast.tsx";
 
 // Modals
 import { DeployModal } from "./components/modals/DeployModal.tsx";
@@ -61,6 +62,7 @@ export function App() {
         cycleFocus("forward");
         break;
       case "shift-tab":
+      case "back-tab":
         cycleFocus("backward");
         break;
       case "?":
@@ -84,10 +86,21 @@ export function App() {
       case "6":
         setFocusedPanel("history");
         break;
-      case "o":
-        openInEditor();
-        break;
     }
+  });
+
+  useSelectionHandler((selection) => {
+    const text = selection.getSelectedText();
+    if (!text) return;
+    void copyToClipboard(text)
+      .then(() => {
+        setToastMessage("copied to clipboard");
+        setTimeout(() => setToastMessage(null), 2000);
+      })
+      .catch(() => {
+        setToastMessage("Failed to Copy");
+        setTimeout(() => setToastMessage(null), 2000);
+      });
   });
 
   return (
@@ -115,6 +128,8 @@ export function App() {
       <box height={1}>
         <StatusBar />
       </box>
+
+      <Toast />
 
       <Show when={state.modal?.type === "deploy"}>
         <DeployModal />
