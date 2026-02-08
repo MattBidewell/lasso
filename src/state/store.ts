@@ -232,6 +232,121 @@ export function getBindings(): NormalizedBinding[] {
   return bindings;
 }
 
+export interface BindingEntry {
+  normalized: NormalizedBinding;
+  raw: unknown;
+}
+
+export function getBindingEntries(): BindingEntry[] {
+  const config = getSelectedConfig();
+  if (!config?.config) return [];
+
+  const env = getSelectedEnv();
+  const wranglerConfig = config.config;
+  const envConfig = env !== "default" ? wranglerConfig.env?.[env] : undefined;
+  const source = envConfig || wranglerConfig;
+
+  const entries: BindingEntry[] = [];
+
+  // KV Namespaces
+  for (const kv of source.kv_namespaces ?? []) {
+    entries.push({
+      normalized: {
+        type: "kv",
+        name: kv.binding,
+        id: kv.id,
+        supportsRemote: true,
+      },
+      raw: kv,
+    });
+  }
+
+  // D1 Databases
+  for (const d1 of source.d1_databases ?? []) {
+    entries.push({
+      normalized: {
+        type: "d1",
+        name: d1.binding,
+        id: d1.database_id,
+        displayName: d1.database_name,
+        supportsRemote: true,
+      },
+      raw: d1,
+    });
+  }
+
+  // R2 Buckets
+  for (const r2 of source.r2_buckets ?? []) {
+    entries.push({
+      normalized: {
+        type: "r2",
+        name: r2.binding,
+        displayName: r2.bucket_name,
+        supportsRemote: true,
+      },
+      raw: r2,
+    });
+  }
+
+  // Durable Objects
+  for (const doBinding of source.durable_objects?.bindings ?? []) {
+    entries.push({
+      normalized: {
+        type: "do",
+        name: doBinding.name,
+        displayName: doBinding.class_name,
+        supportsRemote: true,
+      },
+      raw: doBinding,
+    });
+  }
+
+  // Services
+  for (const service of source.services ?? []) {
+    entries.push({
+      normalized: {
+        type: "service",
+        name: service.binding,
+        displayName: service.service,
+        supportsRemote: false,
+      },
+      raw: service,
+    });
+  }
+
+  // Queues
+  for (const queue of source.queues?.producers ?? []) {
+    entries.push({
+      normalized: {
+        type: "queue",
+        name: queue.binding,
+        displayName: queue.queue,
+        supportsRemote: false,
+      },
+      raw: queue,
+    });
+  }
+
+  // Vars
+  for (const [key, value] of Object.entries(source.vars ?? {})) {
+    entries.push({
+      normalized: {
+        type: "var",
+        name: key,
+        supportsRemote: false,
+      },
+      raw: { name: key, value },
+    });
+  }
+
+  return entries;
+}
+
+export function getSelectedBindingEntry(): BindingEntry | undefined {
+  const entries = getBindingEntries();
+  return entries[state.selectedBindingIndex];
+}
+
 // ============ Execution Actions ============
 
 export function addExecution(execution: Execution): void {

@@ -1,58 +1,66 @@
+import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
+import { useKeyboard } from "@opentui/solid";
 import { COLORS } from "../../themes/index.ts";
-import { state, setFocusedPanel } from "../../state/store.ts";
+import {
+  state,
+  setFocusedPanel,
+  getBindingEntries,
+  selectBinding,
+} from "../../state/store.ts";
 
 export function BindingsPanel() {
   const isFocused = () => state.focusedPanel === "bindings";
 
-  const renderContent = () => {
-    // Access state to establish reactive dependencies
-    const configs = state.configs;
-    const selectedIndex = state.selectedConfigIndex;
-    const envIndex = state.selectedEnvIndex;
+  const entries = createMemo(() => getBindingEntries());
+  const [renderOn, setRenderOn] = createSignal(true);
+  const selectedIndex = () => state.selectedBindingIndex;
 
-    const config = configs[selectedIndex];
-    if (!config?.config) {
-      return <text fg={COLORS.muted}>  No bindings</text>;
+  createEffect(() => {
+    const count = entries().length;
+    state.selectedConfigIndex;
+    state.selectedEnvIndex;
+    if (count === 0) {
+      selectBinding(0);
+      return;
     }
+    if (selectedIndex() >= count) {
+      selectBinding(count - 1);
+    }
+  });
 
-    const env = config.environments[envIndex] ?? "default";
-    const wranglerConfig = config.config;
-    const envConfig = env !== "default" ? wranglerConfig.env?.[env] : undefined;
-    const source = envConfig || wranglerConfig;
+  createEffect(() => {
+    entries().length;
+    state.selectedConfigIndex;
+    state.selectedEnvIndex;
+    setRenderOn(false);
+    queueMicrotask(() => setRenderOn(true));
+  });
 
-    const lines: string[] = [];
+  useKeyboard((event) => {
+    if (!isFocused()) return;
+    if (state.modal) return;
 
-    if (source.kv_namespaces?.length) {
-      lines.push(`KV: ${source.kv_namespaces.length}`);
+    switch (event.name) {
+      case "j":
+      case "down":
+        selectBinding(selectedIndex() + 1);
+        break;
+      case "k":
+      case "up":
+        selectBinding(selectedIndex() - 1);
+        break;
+      case "g":
+        if (event.shift) {
+          selectBinding(entries().length - 1);
+        } else {
+          selectBinding(0);
+        }
+        break;
+      case "G":
+        selectBinding(entries().length - 1);
+        break;
     }
-    if (source.d1_databases?.length) {
-      lines.push(`D1: ${source.d1_databases.length}`);
-    }
-    if (source.r2_buckets?.length) {
-      lines.push(`R2: ${source.r2_buckets.length}`);
-    }
-    if (source.durable_objects?.bindings?.length) {
-      lines.push(`DO: ${source.durable_objects.bindings.length}`);
-    }
-    if (source.services?.length) {
-      lines.push(`Services: ${source.services.length}`);
-    }
-    const queues = (source.queues?.producers?.length ?? 0) + (source.queues?.consumers?.length ?? 0);
-    if (queues) {
-      lines.push(`Queues: ${queues}`);
-    }
-    const vars = Object.keys(source.vars ?? {}).length;
-    if (vars) {
-      lines.push(`Vars: ${vars}`);
-    }
-
-    if (lines.length === 0) {
-      return <text fg={COLORS.muted}>  No bindings</text>;
-    }
-
-    // Join all lines with newlines into a single text element
-    return <text fg={COLORS.normal}>{lines.map((line) => `  ${line}`).join("\n")}</text>;
-  };
+  });
 
   return (
     <scrollbox
@@ -65,7 +73,33 @@ export function BindingsPanel() {
       focused={isFocused()}
       onMouseDown={() => setFocusedPanel("bindings")}
     >
-      {renderContent()}
+      <Show when={renderOn()}>
+          <Show
+            when={entries().length > 0}
+            fallback={<text fg={COLORS.muted}> No bindings</text>}
+          >
+            <For each={entries()}>
+              {(entry, i) => {
+                const selected = createMemo(() => i() === selectedIndex());
+                const active = createMemo(() => isFocused() && selected());
+                const prefix = createMemo(() => (active() ? "> " : "  "));
+                const label = entry.normalized.displayName ?? entry.normalized.name;
+                const content = createMemo(
+                  () =>
+                    `${prefix()}${label} (${entry.normalized.type.toUpperCase()})`,
+                );
+
+                return (
+                  <text fg={active() ? COLORS.selected : COLORS.normal}>
+                    <Show when={active()} fallback={<span>{content()}</span>}>
+                      <strong>{content()}</strong>
+                    </Show>
+                  </text>
+                );
+              }}
+            </For>
+          </Show>
+      </Show>
     </scrollbox>
   );
 }

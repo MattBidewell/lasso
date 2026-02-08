@@ -1,12 +1,20 @@
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { state, getActiveExecution, getActiveSession, clearExecutionOutput, setFocusedPanel } from "../../state/store.ts";
+import { SyntaxStyle } from "@opentui/core";
+import {
+  state,
+  getActiveExecution,
+  getActiveSession,
+  clearExecutionOutput,
+  setFocusedPanel,
+  getSelectedBindingEntry,
+} from "../../state/store.ts";
 import { stopSession } from "../../state/actions.ts";
 import { COLORS } from "../../themes/index.ts";
 import type { OutputSegment } from "../../types.ts";
 
 const VISIBLE_HEIGHT = 50;
-const PAGE_SIZE = 5;
+const JSON_STYLE: any = SyntaxStyle.create();
 
 export function OutputPanel() {
   let scrollboxRef: any;
@@ -27,6 +35,8 @@ export function OutputPanel() {
   const activeExecution = () => getActiveExecution();
   const activeSession = () => getActiveSession();
   const isRunning = () => activeSession()?.status === "running";
+  const isBindingsView = () => state.focusedPanel === "bindings";
+  const selectedBinding = () => getSelectedBindingEntry();
 
   const [isSticky, setIsSticky] = createSignal(true);
 
@@ -39,6 +49,15 @@ export function OutputPanel() {
   });
 
   const title = createMemo(() => {
+    if (isBindingsView()) {
+      const entry = selectedBinding();
+      if (!entry) {
+        return "[5] Output · Binding details";
+      }
+      const label = entry.normalized.displayName ?? entry.normalized.name;
+      return `[5] Output · Binding: ${label} (${entry.normalized.type.toUpperCase()})`;
+    }
+
     const execution = activeExecution();
     let titleText = "[5] Output";
 
@@ -147,6 +166,16 @@ export function OutputPanel() {
 
   });
 
+  const bindingJson = createMemo(() => {
+    const entry = selectedBinding();
+    if (!entry) return null;
+    try {
+      return JSON.stringify(entry.raw, null, 2);
+    } catch {
+      return "{\n  \"error\": \"Unable to render binding JSON\"\n}";
+    }
+  });
+
   const renderSegment = (segment: OutputSegment) => {
     let node: unknown = segment.text;
     if (segment.bold) {
@@ -179,24 +208,39 @@ export function OutputPanel() {
       stickyStart="bottom"
       onMouseDown={() => setFocusedPanel("output")}
     >
-      <Show
-        when={output().length > 0}
-        fallback={<text fg={COLORS.muted}>  No output yet. Select config, environment, and action (press 4).</text>}
-      >
-        <text fg={COLORS.normal}>
-          <For each={output()}>
-            {(line, i) => (
-              <span>
-                <For each={line.segments}>
-                  {(segment) => renderSegment(segment)}
-                </For>
-                <Show when={i() < output().length - 1}>
-                  <br />
-                </Show>
-              </span>
-            )}
-          </For>
-        </text>
+      <Show when={isBindingsView()}>
+        <Show
+          when={bindingJson()}
+          fallback={<text fg={COLORS.muted}>  No binding selected.</text>}
+        >
+          <code
+            content={bindingJson() ?? ""}
+            filetype="json"
+            syntaxStyle={JSON_STYLE as any}
+            height="100%"
+          />
+        </Show>
+      </Show>
+      <Show when={!isBindingsView()}>
+        <Show
+          when={output().length > 0}
+          fallback={<text fg={COLORS.muted}>  No output yet. Select config, environment, and action (press 4).</text>}
+        >
+          <text fg={COLORS.normal}>
+            <For each={output()}>
+              {(line, i) => (
+                <span>
+                  <For each={line.segments}>
+                    {(segment) => renderSegment(segment)}
+                  </For>
+                  <Show when={i() < output().length - 1}>
+                    <br />
+                  </Show>
+                </span>
+              )}
+            </For>
+          </text>
+        </Show>
       </Show>
     </scrollbox>
   );
