@@ -30,8 +30,8 @@ export function AboutPanel() {
       <text fg={COLORS.muted}>  j/k or ↑↓      Move up/down</text>
       <text fg={COLORS.muted}>  g/G            Jump to top/bottom</text>
       <text fg={COLORS.muted}>  Tab            Cycle focus forward</text>
-      <text fg={COLORS.muted}>  Shift+Tab      Cycle focus backward</text>
       <text fg={COLORS.muted}>  1-6            Jump to panel 1-6</text>
+      <text fg={COLORS.muted}>  Update         lasso update / lasso upgrade</text>
       <text> </text>
 
       <text fg={COLORS.title}><strong>Actions</strong></text>

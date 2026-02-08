@@ -7,32 +7,25 @@ A TUI (Terminal User Interface) for managing Cloudflare Wrangler configs in mono
 ### Quick Install (Recommended)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/mattbidewell/lasso/main/install.sh | bash
-```
-
-### Homebrew (macOS/Linux)
-
-```bash
-brew install mattbidewell/tap/lasso
-```
-
-### npm / bun
-
-```bash
-npm install -g lasso
-# or
-bun install -g lasso
+curl -fsSL https://github.com/mattbidewell/lasso/releases/latest/download/install.sh | sh
 ```
 
 ### Manual Download
 
 Download the latest binary from [GitHub Releases](https://github.com/mattbidewell/lasso/releases) for your platform:
 
-- **macOS (Apple Silicon)**: `lasso-darwin-arm64.tar.gz`
-- **macOS (Intel)**: `lasso-darwin-x64.tar.gz`
-- **Linux (x64)**: `lasso-linux-x64.tar.gz`
-- **Linux (ARM64)**: `lasso-linux-arm64.tar.gz`
-- **Windows**: `lasso-windows-x64.zip`
+- **macOS (Apple Silicon)**: `lasso-darwin-arm64`
+- **macOS (Intel)**: `lasso-darwin-x64`
+- **Linux (x64)**: `lasso-linux-x64`
+- **Linux (ARM64)**: `lasso-linux-arm64`
+
+### Update
+
+```bash
+lasso update
+# or
+lasso upgrade
+```
 
 ## Usage
 
@@ -49,10 +42,8 @@ lasso
 |-----|--------|
 | `j/k` or `↑/↓` | Navigate up/down |
 | `Tab` | Cycle focus between panels |
-| `Enter` | Select / Run dev server |
-| `Ctrl+D` | Deploy selected environment |
+| `Enter` | Start action |
 | `g` / `G` | Jump to top / bottom |
-| `r` | Refresh configs |
 | `q` | Quit |
 
 ## Features
@@ -76,14 +67,8 @@ bun dev
 # Type check
 bun run typecheck
 
-# Build for npm distribution
-bun run build
-
 # Build standalone binary (current platform)
-bun run build:binary
-
-# Build release binaries (all platforms)
-bun run build:release
+bun run build
 ```
 
 ## License

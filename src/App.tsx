@@ -61,10 +61,6 @@ export function App() {
       case "tab":
         cycleFocus("forward");
         break;
-      case "shift-tab":
-      case "back-tab":
-        cycleFocus("backward");
-        break;
       case "?":
         showHelpModal();
         break;

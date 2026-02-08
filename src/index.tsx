@@ -1,19 +1,31 @@
 import path from "node:path";
 import { render } from "@opentui/solid";
 import { App } from "./App.tsx";
-import { setConfigs, addConfig, removeConfig, setStatusMessage, setAnsiEnabled } from "./state/store.ts";
+import { setConfigs, addConfig, removeConfig, setStatusMessage, setAnsiEnabled, setToastMessage } from "./state/store.ts";
 import { setRenderCallback, exitApp } from "./state/actions.ts";
 import { findWranglerConfigs, discoverAndParse, watchWranglerConfigs } from "./core/discovery/index.ts";
 import { parseConfig } from "./core/discovery/parse-config.ts";
 import { parseArgs } from "./cli/args.ts";
+import { checkForUpdate, runUpdate } from "./core/update.ts";
 import type { FSWatcher } from "chokidar";
 
 let watcher: FSWatcher | null = null;
 
 async function main() {
   const cliOptions = parseArgs();
+  if (cliOptions.command === "update" || cliOptions.command === "upgrade") {
+    await runUpdate(cliOptions.assumeYes);
+    process.exit(0);
+  }
+
   const cwd = cliOptions.targetPath;
   setAnsiEnabled(cliOptions.ansiEnabled);
+
+  const updateMessage = await checkForUpdate();
+  if (updateMessage) {
+    setToastMessage(updateMessage);
+    setTimeout(() => setToastMessage(null), 2000);
+  }
 
   // Set up render callback for process controller
   setRenderCallback(() => {

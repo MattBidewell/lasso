@@ -44,8 +44,8 @@ export function HelpModal() {
         <text fg={COLORS.normal}>    q             Quit</text>
         <text fg={COLORS.normal}>    ?             Toggle help</text>
         <text fg={COLORS.normal}>    Tab           Cycle panels forward</text>
-        <text fg={COLORS.normal}>    Shift+Tab     Cycle panels backward</text>
         <text fg={COLORS.normal}>    1-6           Jump to panel</text>
+        <text fg={COLORS.normal}>    Update        lasso update / lasso upgrade</text>
         <text fg={COLORS.muted}>  ─────────────────────────────────────────────</text>
 
         <text fg={COLORS.accent}><strong>  Panels</strong></text>

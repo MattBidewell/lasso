@@ -10,10 +10,8 @@
     "dist"
   ],
   "scripts": {
-    "dev": "bun run src/index.tsx",
-    "build": "bun build src/index.tsx --outdir dist --target node --minify",
-    "build:binary": "bun build src/index.tsx --compile --minify --outfile dist/lasso",
-    "build:release": "bash scripts/build.sh",
+    "dev": "bun --preload @opentui/solid/preload run src/index.tsx",
+    "build": "bun run scripts/build-binary.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "bun run build"
