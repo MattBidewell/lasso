@@ -1,4 +1,4 @@
-import { For, createMemo, Show } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import { state, selectEnv, getSelectedConfig, hasActiveSession, setFocusedPanel } from "../../state/store.ts";
 import { COLORS } from "../../themes/index.ts";
@@ -10,6 +10,16 @@ export function EnvironmentsPanel() {
   const environments = createMemo(() => {
     const config = getSelectedConfig();
     return config?.environments ?? [];
+  });
+
+  const [renderOn, setRenderOn] = createSignal(true);
+
+  createEffect(() => {
+    environments().length;
+    state.selectedConfigIndex;
+    state.selectedEnvIndex;
+    setRenderOn(false);
+    queueMicrotask(() => setRenderOn(true));
   });
 
   useKeyboard((event) => {
@@ -73,18 +83,22 @@ export function EnvironmentsPanel() {
       focused={isFocused()}
       onMouseDown={() => setFocusedPanel("environments")}
     >
-      <Show when={items().length === 0}>
-        <text fg={COLORS.muted}>  No environments</text>
+      <Show when={renderOn()}>
+        <Show
+          when={items().length > 0}
+          fallback={<text fg={COLORS.muted}>  No environments</text>}
+        >
+          <For each={items()}>
+            {(item) => (
+              <text fg={item.active ? COLORS.selected : COLORS.normal}>
+                <Show when={item.active} fallback={<span>{item.prefix}{item.name}{item.isActive ? " ●" : ""}</span>}>
+                  <strong>{item.prefix}{item.name}{item.isActive ? " ●" : ""}</strong>
+                </Show>
+              </text>
+            )}
+          </For>
+        </Show>
       </Show>
-      <For each={items()}>
-        {(item) => (
-          <text fg={item.active ? COLORS.selected : COLORS.normal}>
-            <Show when={item.active} fallback={<span>{item.prefix}{item.name}{item.isActive ? " ●" : ""}</span>}>
-              <strong>{item.prefix}{item.name}{item.isActive ? " ●" : ""}</strong>
-            </Show>
-          </text>
-        )}
-      </For>
     </scrollbox>
   );
 }
