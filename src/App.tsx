@@ -18,6 +18,7 @@ import { ActionsPanel } from "./components/panels/ActionsPanel.tsx";
 import { AboutPanel } from "./components/panels/AboutPanel.tsx";
 import { OutputPanel } from "./components/panels/OutputPanel.tsx";
 import { TerminalHistoryPanel } from "./components/panels/TerminalHistoryPanel.tsx";
+import { DebugLogPanel } from "./components/panels/DebugLogPanel.tsx";
 import { Toast } from "./components/Toast.tsx";
 
 // Modals
@@ -82,6 +83,11 @@ export function App() {
       case "6":
         setFocusedPanel("history");
         break;
+      case "7":
+        if (state.debugEnabled) {
+          setFocusedPanel("debug");
+        }
+        break;
     }
   });
 
@@ -127,6 +133,12 @@ export function App() {
       <box height={1}>
         <StatusBar />
       </box>
+
+      <Show when={state.debugEnabled}>
+        <box height="50%">
+          <DebugLogPanel />
+        </box>
+      </Show>
 
       <Toast />
 

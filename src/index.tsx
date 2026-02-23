@@ -1,8 +1,16 @@
 import path from "node:path";
 import { render } from "@opentui/solid";
 import { App } from "./App.tsx";
-import { setConfigs, addConfig, removeConfig, setStatusMessage, setAnsiEnabled, setToastMessage } from "./state/store.ts";
-import { setRenderCallback, exitApp } from "./state/actions.ts";
+import {
+  setConfigs,
+  addConfig,
+  removeConfig,
+  setStatusMessage,
+  setAnsiEnabled,
+  setToastMessage,
+  setDebugEnabled,
+} from "./state/store.ts";
+import { setRenderCallback, exitApp, enableDebugLogging } from "./state/actions.ts";
 import { findWranglerConfigs, discoverAndParse, watchWranglerConfigs } from "./core/discovery/index.ts";
 import { parseConfig } from "./core/discovery/parse-config.ts";
 import { parseArgs } from "./cli/args.ts";
@@ -20,6 +28,8 @@ async function main() {
 
   const cwd = cliOptions.targetPath;
   setAnsiEnabled(cliOptions.ansiEnabled);
+  setDebugEnabled(cliOptions.debugEnabled);
+  enableDebugLogging();
 
   const updateMessage = await checkForUpdate();
   if (updateMessage) {

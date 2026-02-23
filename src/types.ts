@@ -44,7 +44,7 @@ export interface DiscoveredConfig {
 }
 
 // UI panels
-export type Panel = "configs" | "environments" | "bindings" | "actions" | "output" | "history";
+export type Panel = "configs" | "environments" | "bindings" | "actions" | "output" | "history" | "debug";
 
 // Normalized binding type for display
 export type BindingType = "kv" | "d1" | "r2" | "do" | "service" | "queue" | "var";
@@ -68,6 +68,15 @@ export interface OutputSegment {
 export interface OutputLine {
   raw: string;
   segments: OutputSegment[];
+}
+
+export type DebugLogLevel = "info" | "warn" | "error" | "debug";
+
+export interface DebugLogEntry {
+  id: string;
+  timestamp: number;
+  level: DebugLogLevel;
+  message: string;
 }
 
 // Session types
@@ -150,6 +159,8 @@ export interface AppState {
   modal: ModalState | null;
   ansiEnabled: boolean;
   toastMessage: string | null;
+  debugEnabled: boolean;
+  debugLogs: DebugLogEntry[];
 
   // Executions and output
   executions: Execution[];

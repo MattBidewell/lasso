@@ -12,6 +12,8 @@ export function parseConfig(
   const directory = path.dirname(configPath);
   const dirName = path.basename(directory);
 
+  console.debug(`Parsing wrangler config: ${relativePath}`);
+
   try {
     const raw = readFileSync(configPath, 'utf-8');
     const json = JSON.parse(stripJsonComments(raw));
@@ -46,6 +48,8 @@ export function parseConfig(
       }
     }
 
+    console.debug(`Failed to parse config: ${relativePath} (${message})`);
+
     return {
       path: configPath,
       relativePath,
@@ -62,5 +66,6 @@ export async function discoverAndParse(
   cwd: string,
   configPaths: string[]
 ): Promise<DiscoveredConfig[]> {
+  console.debug(`Discover/parse start: ${configPaths.length} configs`);
   return configPaths.map(p => parseConfig(p, cwd));
 }

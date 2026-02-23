@@ -46,6 +46,12 @@ lasso
 | `g` / `G` | Jump to top / bottom |
 | `q` | Quit |
 
+### Debug Logging
+
+Run with `--debug` to show a debug log window in the UI. This captures program
+logs (runner logs excluded) and keeps the normal UI unchanged when the flag is
+not used.
+
 ## Features
 
 - Discover all `wrangler.toml` and `wrangler.json` files in your project

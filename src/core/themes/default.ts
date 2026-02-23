@@ -4,6 +4,7 @@ export const COLORS = {
   activeBorder: "#f59e0b",   // Orange for focused panels
   inactiveBorder: "#6b7280", // Gray for unfocused panels
   border: "#6b7280",         // Default border (alias for inactive)
+  debugBorder: "#38bdf8",    // Blue for debug panel
 
   // Text colors
   title: "#fafafa",
