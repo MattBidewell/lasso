@@ -9,6 +9,7 @@ export interface CliOptions {
   watchEnabled: boolean;
   ansiEnabled: boolean;
   assumeYes: boolean;
+  debugEnabled: boolean;
 }
 
 export function parseArgs(): CliOptions {
@@ -18,6 +19,7 @@ export function parseArgs(): CliOptions {
   let watchEnabled = true;
   let ansiEnabled = true;
   let assumeYes = false;
+  let debugEnabled = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -44,6 +46,7 @@ Arguments:
   -v, --version         Show version
   --no-watch            Disable file watching
   --no-ansi             Disable ANSI color parsing
+  --debug               Show debug log window
   --yes                 Skip confirmation prompts
 `);
       process.exit(0);
@@ -74,11 +77,16 @@ Arguments:
       continue;
     }
 
+    if (arg === "--debug") {
+      debugEnabled = true;
+      continue;
+    }
+
     // Assume it's a path
     if (arg && !arg.startsWith("-")) {
       targetPath = path.resolve(arg);
     }
   }
 
-  return { command, targetPath, watchEnabled, ansiEnabled, assumeYes };
+  return { command, targetPath, watchEnabled, ansiEnabled, assumeYes, debugEnabled };
 }

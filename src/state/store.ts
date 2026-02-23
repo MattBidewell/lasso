@@ -10,10 +10,12 @@ import type {
   Session,
   SessionAction,
   SessionStatus,
+  DebugLogEntry,
 } from "../types.ts";
 import { createSessionId } from "../types.ts";
 
 const MAX_OUTPUT_LINES = 500;
+const MAX_DEBUG_LOG_LINES = 1000;
 
 function createInitialState(cwd: string): AppState {
   return {
@@ -29,6 +31,8 @@ function createInitialState(cwd: string): AppState {
     modal: null,
     ansiEnabled: true,
     toastMessage: null,
+    debugEnabled: false,
+    debugLogs: [],
 
     // Executions and output
     executions: [],
@@ -92,8 +96,13 @@ export function setFocusedPanel(panel: Panel): void {
   setState("focusedPanel", panel);
 }
 
+function getPanels(): Panel[] {
+  const base: Panel[] = ["configs", "environments", "bindings", "actions", "output", "history"];
+  return state.debugEnabled ? [...base, "debug"] : base;
+}
+
 export function cycleFocus(direction: "forward" | "backward" = "forward"): void {
-  const panels: Panel[] = ["configs", "environments", "bindings", "actions", "output", "history"];
+  const panels = getPanels();
   const currentIndex = panels.indexOf(state.focusedPanel);
   const nextIndex = direction === "forward"
     ? (currentIndex + 1) % panels.length
@@ -125,6 +134,13 @@ export function setToastMessage(message: string | null): void {
 
 export function setAnsiEnabled(enabled: boolean): void {
   setState("ansiEnabled", enabled);
+}
+
+export function setDebugEnabled(enabled: boolean): void {
+  setState("debugEnabled", enabled);
+  if (!enabled && state.focusedPanel === "debug") {
+    setState("focusedPanel", "history");
+  }
 }
 
 // ============ Derived State (Selectors) ============
@@ -492,6 +508,18 @@ export function getExecutionOutput(executionId: string): OutputLine[] {
 export function getActiveOutput(): OutputLine[] {
   if (!state.activeExecutionId) return [];
   return state.outputByExecution[state.activeExecutionId] ?? [];
+}
+
+export function appendDebugLog(entry: DebugLogEntry): void {
+  setState("debugLogs", (logs) => [...logs, entry].slice(-MAX_DEBUG_LOG_LINES));
+}
+
+export function clearDebugLogs(): void {
+  setState("debugLogs", []);
+}
+
+export function getDebugLogs(): DebugLogEntry[] {
+  return state.debugLogs;
 }
 
 // ============ Reinitialize ============

@@ -14,6 +14,7 @@ import {
   activateSession,
   appendExecutionOutput,
   clearExecutionOutput,
+  appendDebugLog,
   getSession,
   getSelectedSession,
 } from "./store.ts";
@@ -27,18 +28,74 @@ let triggerRender: (() => void) | null = null;
 // Renderer reference for cleanup on exit
 let rendererInstance: { destroy: () => void } | null = null;
 
+let consolePatched = false;
+const originalConsole = {
+  log: console.log,
+  info: console.info,
+  warn: console.warn,
+  error: console.error,
+  debug: console.debug,
+};
+let debugLogCounter = 0;
+
 export function setRenderer(renderer: { destroy: () => void }): void {
   rendererInstance = renderer;
 }
 
 export function exitApp(): void {
   runner?.stopAll();
+  if (consolePatched) {
+    console.log = originalConsole.log;
+    console.info = originalConsole.info;
+    console.warn = originalConsole.warn;
+    console.error = originalConsole.error;
+    console.debug = originalConsole.debug;
+    consolePatched = false;
+  }
   rendererInstance?.destroy();
   process.exit(0);
 }
 
 export function setRenderCallback(callback: () => void): void {
   triggerRender = callback;
+}
+
+function createDebugLogId(): string {
+  debugLogCounter += 1;
+  return `${Date.now().toString(36)}${debugLogCounter.toString(36)}`;
+}
+
+function formatLogArg(arg: unknown): string {
+  if (arg instanceof Error) {
+    return arg.stack ?? arg.message;
+  }
+  if (typeof arg === "string") return arg;
+  try {
+    return JSON.stringify(arg, null, 2);
+  } catch {
+    return String(arg);
+  }
+}
+
+function pushDebugLog(level: "info" | "warn" | "error" | "debug", args: unknown[]): void {
+  if (!state.debugEnabled) return;
+  const message = args.map(formatLogArg).join(" ");
+  appendDebugLog({
+    id: createDebugLogId(),
+    timestamp: Date.now(),
+    level,
+    message,
+  });
+}
+
+export function enableDebugLogging(): void {
+  if (!state.debugEnabled || consolePatched) return;
+  consolePatched = true;
+  console.log = (...args: unknown[]) => pushDebugLog("info", args);
+  console.info = (...args: unknown[]) => pushDebugLog("info", args);
+  console.warn = (...args: unknown[]) => pushDebugLog("warn", args);
+  console.error = (...args: unknown[]) => pushDebugLog("error", args);
+  console.debug = (...args: unknown[]) => pushDebugLog("debug", args);
 }
 
 // ============ Runner Setup ============
@@ -128,6 +185,8 @@ export function startDevSession(): void {
     command: buildCommand("dev", config.path, env),
   });
 
+  pushDebugLog("info", [`[debug] Starting dev session for ${config.name} (${env})`]);
+
   activateSession(sessionId);
   setFocusedPanel("output");
 
@@ -161,6 +220,8 @@ export function startTailSession(options: TailOptions = {}): void {
     startedAt: Date.now(),
     command: buildCommand("tail", config.path, env),
   });
+
+  pushDebugLog("info", [`[debug] Starting tail session for ${config.name} (${env})`]);
 
   activateSession(sessionId);
   setFocusedPanel("output");
@@ -196,6 +257,8 @@ export function startDeploySession(options?: DeployOptions): void {
     command: buildCommand("deploy", config.path, env),
   });
 
+  pushDebugLog("info", [`[debug] Starting deploy session for ${config.name} (${env})`]);
+
   activateSession(sessionId);
   setFocusedPanel("output");
 
@@ -210,6 +273,7 @@ export function stopSession(sessionId: string): void {
       session.executionId,
       parseAnsiLine("[lasso] Sent SIGINT to stop execution.", state.ansiEnabled)
     );
+    pushDebugLog("info", [`[debug] Sent SIGINT to stop session ${session.id}`]);
     getRunner().stop(sessionId, "SIGINT");
   }
 }
