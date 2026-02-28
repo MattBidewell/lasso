@@ -11,8 +11,15 @@ import type {
   SessionAction,
   SessionStatus,
   DebugLogEntry,
+  FieldBindingType,
+  BindingEditModalState,
+  BindingTypeSelectModalState,
+  ConfirmDeleteModalState,
+  EnvironmentEditModalState,
+  EnvironmentDeleteModalState,
 } from "../types.ts";
 import { createSessionId } from "../types.ts";
+import { fieldRegistry } from "../fields/index.ts";
 
 const MAX_OUTPUT_LINES = 500;
 const MAX_DEBUG_LOG_LINES = 1000;
@@ -143,6 +150,231 @@ export function setDebugEnabled(enabled: boolean): void {
   }
 }
 
+// ============ Binding Edit Modal Actions ============
+
+/**
+ * Open the binding type selection modal
+ */
+export function openBindingTypeSelect(): void {
+  const modal: BindingTypeSelectModalState = {
+    type: "binding_type_select",
+    selectedIndex: 0,
+  };
+  setState("modal", modal);
+}
+
+/**
+ * Open the add binding modal for a specific type
+ */
+export function openAddBinding(bindingType: FieldBindingType): void {
+  const definition = fieldRegistry.getBindingType(bindingType);
+  if (!definition) return;
+
+  // Initialize values with defaults
+  const initialValues: Record<string, unknown> = {};
+  for (const field of definition.fields) {
+    if (field.defaultValue !== undefined) {
+      initialValues[field.name] = field.defaultValue;
+    }
+  }
+
+  const modal: BindingEditModalState = {
+    type: "binding_edit",
+    mode: "add",
+    bindingType,
+    values: initialValues,
+    errors: {},
+    activeFieldIndex: 0,
+  };
+  setState("modal", modal);
+}
+
+/**
+ * Open the edit binding modal for an existing binding
+ */
+export function openEditBinding(
+  bindingType: FieldBindingType,
+  bindingIndex: number,
+  existingValues: Record<string, unknown>
+): void {
+  const modal: BindingEditModalState = {
+    type: "binding_edit",
+    mode: "edit",
+    bindingType,
+    bindingIndex,
+    values: { ...existingValues },
+    errors: {},
+    activeFieldIndex: 0,
+  };
+  setState("modal", modal);
+}
+
+/**
+ * Open the delete confirmation modal
+ */
+export function openDeleteBinding(
+  bindingType: FieldBindingType,
+  bindingIndex: number,
+  displayName: string
+): void {
+  const modal: ConfirmDeleteModalState = {
+    type: "confirm_delete",
+    bindingType,
+    bindingIndex,
+    displayName,
+  };
+  setState("modal", modal);
+}
+
+/**
+ * Update a field value in the binding edit modal
+ */
+export function updateBindingEditField(fieldName: string, value: unknown): void {
+  const modal = state.modal;
+  if (modal?.type !== "binding_edit") return;
+
+  setState("modal", {
+    ...modal,
+    values: { ...modal.values, [fieldName]: value },
+  });
+}
+
+/**
+ * Update a field error in the binding edit modal
+ */
+export function updateBindingEditError(fieldName: string, error: string | undefined): void {
+  const modal = state.modal;
+  if (modal?.type !== "binding_edit") return;
+
+  const newErrors = { ...modal.errors };
+  if (error) {
+    newErrors[fieldName] = error;
+  } else {
+    delete newErrors[fieldName];
+  }
+
+  setState("modal", {
+    ...modal,
+    errors: newErrors,
+  });
+}
+
+/**
+ * Set all errors in the binding edit modal
+ */
+export function setBindingEditErrors(errors: Record<string, string>): void {
+  const modal = state.modal;
+  if (modal?.type !== "binding_edit") return;
+
+  setState("modal", {
+    ...modal,
+    errors,
+  });
+}
+
+/**
+ * Set the active field index in the binding edit modal
+ */
+export function setBindingEditActiveField(index: number): void {
+  const modal = state.modal;
+  if (modal?.type !== "binding_edit") return;
+
+  setState("modal", {
+    ...modal,
+    activeFieldIndex: index,
+  });
+}
+
+/**
+ * Update selected index in binding type select modal
+ */
+export function setBindingTypeSelectIndex(index: number): void {
+  const modal = state.modal;
+  if (modal?.type !== "binding_type_select") return;
+
+  setState("modal", {
+    ...modal,
+    selectedIndex: index,
+  });
+}
+
+// ============ Environment Edit Modal Actions ============
+
+/**
+ * Open the add environment modal
+ */
+export function openAddEnvironment(): void {
+  const modal: EnvironmentEditModalState = {
+    type: "environment_edit",
+    mode: "add",
+    name: "",
+  };
+  setState("modal", modal);
+}
+
+/**
+ * Open the edit environment modal for an existing environment
+ */
+export function openEditEnvironment(environmentName: string): void {
+  // Don't allow editing the "default" environment
+  if (environmentName === "default") {
+    setToastMessage("Cannot edit the default environment");
+    return;
+  }
+
+  const modal: EnvironmentEditModalState = {
+    type: "environment_edit",
+    mode: "edit",
+    existingName: environmentName,
+    name: environmentName,
+  };
+  setState("modal", modal);
+}
+
+/**
+ * Open the delete environment confirmation modal
+ */
+export function openDeleteEnvironment(environmentName: string): void {
+  // Don't allow deleting the "default" environment
+  if (environmentName === "default") {
+    setToastMessage("Cannot delete the default environment");
+    return;
+  }
+
+  const modal: EnvironmentDeleteModalState = {
+    type: "environment_delete",
+    environmentName,
+  };
+  setState("modal", modal);
+}
+
+/**
+ * Update the environment name in the edit modal
+ */
+export function updateEnvironmentName(name: string): void {
+  const modal = state.modal;
+  if (modal?.type !== "environment_edit") return;
+
+  setState("modal", {
+    ...modal,
+    name,
+    error: undefined,
+  });
+}
+
+/**
+ * Set the error in the environment edit modal
+ */
+export function setEnvironmentEditError(error: string | undefined): void {
+  const modal = state.modal;
+  if (modal?.type !== "environment_edit") return;
+
+  setState("modal", {
+    ...modal,
+    error,
+  });
+}
+
 // ============ Derived State (Selectors) ============
 
 export function getSelectedConfig(): DiscoveredConfig | undefined {
@@ -251,6 +483,10 @@ export function getBindings(): NormalizedBinding[] {
 export interface BindingEntry {
   normalized: NormalizedBinding;
   raw: unknown;
+  /** The field binding type for editing (e.g., "kv_namespace") */
+  fieldBindingType: FieldBindingType;
+  /** Index within the binding type array */
+  typeIndex: number;
 }
 
 export function getBindingEntries(): BindingEntry[] {
@@ -265,7 +501,9 @@ export function getBindingEntries(): BindingEntry[] {
   const entries: BindingEntry[] = [];
 
   // KV Namespaces
-  for (const kv of source.kv_namespaces ?? []) {
+  const kvNamespaces = source.kv_namespaces ?? [];
+  for (let i = 0; i < kvNamespaces.length; i++) {
+    const kv = kvNamespaces[i]!;
     entries.push({
       normalized: {
         type: "kv",
@@ -274,11 +512,15 @@ export function getBindingEntries(): BindingEntry[] {
         supportsRemote: true,
       },
       raw: kv,
+      fieldBindingType: "kv_namespace",
+      typeIndex: i,
     });
   }
 
   // D1 Databases
-  for (const d1 of source.d1_databases ?? []) {
+  const d1Databases = source.d1_databases ?? [];
+  for (let i = 0; i < d1Databases.length; i++) {
+    const d1 = d1Databases[i]!;
     entries.push({
       normalized: {
         type: "d1",
@@ -288,11 +530,15 @@ export function getBindingEntries(): BindingEntry[] {
         supportsRemote: true,
       },
       raw: d1,
+      fieldBindingType: "d1_database",
+      typeIndex: i,
     });
   }
 
   // R2 Buckets
-  for (const r2 of source.r2_buckets ?? []) {
+  const r2Buckets = source.r2_buckets ?? [];
+  for (let i = 0; i < r2Buckets.length; i++) {
+    const r2 = r2Buckets[i]!;
     entries.push({
       normalized: {
         type: "r2",
@@ -301,11 +547,15 @@ export function getBindingEntries(): BindingEntry[] {
         supportsRemote: true,
       },
       raw: r2,
+      fieldBindingType: "r2_bucket",
+      typeIndex: i,
     });
   }
 
   // Durable Objects
-  for (const doBinding of source.durable_objects?.bindings ?? []) {
+  const doBindings = source.durable_objects?.bindings ?? [];
+  for (let i = 0; i < doBindings.length; i++) {
+    const doBinding = doBindings[i]!;
     entries.push({
       normalized: {
         type: "do",
@@ -314,11 +564,15 @@ export function getBindingEntries(): BindingEntry[] {
         supportsRemote: true,
       },
       raw: doBinding,
+      fieldBindingType: "durable_object",
+      typeIndex: i,
     });
   }
 
   // Services
-  for (const service of source.services ?? []) {
+  const services = source.services ?? [];
+  for (let i = 0; i < services.length; i++) {
+    const service = services[i]!;
     entries.push({
       normalized: {
         type: "service",
@@ -327,11 +581,15 @@ export function getBindingEntries(): BindingEntry[] {
         supportsRemote: false,
       },
       raw: service,
+      fieldBindingType: "service_binding",
+      typeIndex: i,
     });
   }
 
   // Queues
-  for (const queue of source.queues?.producers ?? []) {
+  const queueProducers = source.queues?.producers ?? [];
+  for (let i = 0; i < queueProducers.length; i++) {
+    const queue = queueProducers[i]!;
     entries.push({
       normalized: {
         type: "queue",
@@ -340,11 +598,15 @@ export function getBindingEntries(): BindingEntry[] {
         supportsRemote: false,
       },
       raw: queue,
+      fieldBindingType: "queue_producer",
+      typeIndex: i,
     });
   }
 
   // Vars
-  for (const [key, value] of Object.entries(source.vars ?? {})) {
+  const varEntries = Object.entries(source.vars ?? {});
+  for (let i = 0; i < varEntries.length; i++) {
+    const [key, value] = varEntries[i]!;
     entries.push({
       normalized: {
         type: "var",
@@ -352,6 +614,8 @@ export function getBindingEntries(): BindingEntry[] {
         supportsRemote: false,
       },
       raw: { name: key, value },
+      fieldBindingType: "environment_variable",
+      typeIndex: i,
     });
   }
 

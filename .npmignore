@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.*
+*.log
+.DS_Store
+.vscode/
+.idea/
+specs/
+tests/
+scripts/
+.specify/
+.github/
+**/*.tgz

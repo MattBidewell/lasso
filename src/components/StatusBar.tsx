@@ -15,9 +15,9 @@ export function StatusBar() {
       case "configs":
         return [...base, "j/k:nav"];
       case "environments":
-        return [...base, "j/k:nav"];
+        return [...base, "j/k:nav", "A:add", "E:edit", "D:delete"];
       case "bindings":
-        return [...base, "j/k:nav"];
+        return [...base, "j/k:nav", "A:add", "E:edit", "D:delete"];
       case "actions":
         return [...base, "j/k:nav", "Enter:start", "x:stop"];
       case "history":

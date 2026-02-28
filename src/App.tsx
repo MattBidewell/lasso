@@ -25,6 +25,11 @@ import { Toast } from "./components/Toast.tsx";
 import { DeployModal } from "./components/modals/DeployModal.tsx";
 import { TailModal } from "./components/modals/TailModal.tsx";
 import { HelpModal } from "./components/modals/HelpModal.tsx";
+import { BindingTypeModal } from "./components/modals/BindingTypeModal.tsx";
+import { EditBindingModal } from "./components/modals/EditBindingModal.tsx";
+import { ConfirmModal } from "./components/modals/ConfirmModal.tsx";
+import { EditEnvironmentModal } from "./components/modals/EditEnvironmentModal.tsx";
+import { DeleteEnvironmentModal } from "./components/modals/DeleteEnvironmentModal.tsx";
 import { StatusBar } from "./components/StatusBar.tsx";
 
 export function App() {
@@ -150,6 +155,21 @@ export function App() {
       </Show>
       <Show when={state.modal?.type === "help"}>
         <HelpModal />
+      </Show>
+      <Show when={state.modal?.type === "binding_type_select"}>
+        <BindingTypeModal />
+      </Show>
+      <Show when={state.modal?.type === "binding_edit"}>
+        <EditBindingModal />
+      </Show>
+      <Show when={state.modal?.type === "confirm_delete"}>
+        <ConfirmModal />
+      </Show>
+      <Show when={state.modal?.type === "environment_edit"}>
+        <EditEnvironmentModal />
+      </Show>
+      <Show when={state.modal?.type === "environment_delete"}>
+        <DeleteEnvironmentModal />
       </Show>
     </box>
   );
