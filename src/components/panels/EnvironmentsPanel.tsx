@@ -1,6 +1,15 @@
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
-import { state, selectEnv, getSelectedConfig, hasActiveSession, setFocusedPanel } from "../../state/store.ts";
+import {
+  state,
+  selectEnv,
+  getSelectedConfig,
+  hasActiveSession,
+  setFocusedPanel,
+  openAddEnvironment,
+  openEditEnvironment,
+  openDeleteEnvironment,
+} from "../../state/store.ts";
 import { COLORS } from "../../themes/index.ts";
 
 export function EnvironmentsPanel() {
@@ -26,9 +35,6 @@ export function EnvironmentsPanel() {
     if (!isFocused()) return;
     if (state.modal) return;
 
-    const isTop = event.name === "g" && !event.shift;
-    const isBottom = (event.name === "G") || (event.name === "g" && event.shift);
-
     switch (event.name) {
       case "j":
       case "down":
@@ -47,6 +53,32 @@ export function EnvironmentsPanel() {
         break;
       case "G":
         selectEnv(environments().length - 1);
+        break;
+      case "a":
+      case "A":
+        // Open add environment modal
+        openAddEnvironment();
+        break;
+      case "e":
+      case "E":
+      case "return":
+        // Open edit environment modal for selected environment
+        {
+          const env = environments()[selectedEnvIndex()];
+          if (env && env !== "default") {
+            openEditEnvironment(env);
+          }
+        }
+        break;
+      case "d":
+      case "D":
+        // Open delete confirmation modal for selected environment
+        {
+          const env = environments()[selectedEnvIndex()];
+          if (env && env !== "default") {
+            openDeleteEnvironment(env);
+          }
+        }
         break;
     }
   });

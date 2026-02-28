@@ -62,6 +62,20 @@ export function HelpModal() {
         <text fg={COLORS.normal}>    g/G           Go to top/bottom</text>
         <text fg={COLORS.muted}>  ─────────────────────────────────────────────</text>
 
+        <text fg={COLORS.accent}><strong>  Bindings Panel</strong></text>
+        <text fg={COLORS.normal}>    A             Add new binding</text>
+        <text fg={COLORS.normal}>    E or Enter    Edit selected binding</text>
+        <text fg={COLORS.normal}>    D             Delete selected binding</text>
+        <text fg={COLORS.muted}>  ─────────────────────────────────────────────</text>
+
+        <text fg={COLORS.accent}><strong>  Edit Modal</strong></text>
+        <text fg={COLORS.normal}>    Tab/Shift+Tab Navigate fields</text>
+        <text fg={COLORS.normal}>    Space         Toggle checkbox</text>
+        <text fg={COLORS.normal}>    Up/Down       Change select value</text>
+        <text fg={COLORS.normal}>    Enter         Save changes</text>
+        <text fg={COLORS.normal}>    Esc           Cancel</text>
+        <text fg={COLORS.muted}>  ─────────────────────────────────────────────</text>
+
         <text fg={COLORS.accent}><strong>  Actions Panel</strong></text>
         <text fg={COLORS.normal}>    Enter         Start action or view output</text>
         <text fg={COLORS.normal}>    x             Stop running session</text>

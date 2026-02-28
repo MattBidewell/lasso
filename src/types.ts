@@ -125,7 +125,7 @@ export function createSessionId(
 }
 
 // Modal types
-export type ModalType = "deploy" | "tail" | "help" | null;
+export type ModalType = "deploy" | "tail" | "help" | "binding_type_select" | "binding_edit" | "config_edit" | "confirm_delete" | "environment_edit" | "environment_delete" | null;
 
 export interface DeployModalState {
   type: "deploy";
@@ -143,7 +143,93 @@ export interface HelpModalState {
   type: "help";
 }
 
-export type ModalState = DeployModalState | TailModalState | HelpModalState;
+// Import the field BindingType (different from display BindingType above)
+import type { BindingType as FieldBindingType } from "./fields/types.ts";
+
+// Re-export for convenience
+export type { FieldBindingType };
+
+/** Modal state for selecting a binding type when adding */
+export interface BindingTypeSelectModalState {
+  type: "binding_type_select";
+  selectedIndex: number;
+}
+
+/** Edit mode: creating new or editing existing */
+export type EditMode = "add" | "edit";
+
+/** Modal state for editing a binding */
+export interface BindingEditModalState {
+  type: "binding_edit";
+  mode: EditMode;
+  bindingType: FieldBindingType;
+  /** Index in the binding array (for edit mode) */
+  bindingIndex?: number;
+  /** Current field values */
+  values: Record<string, unknown>;
+  /** Validation errors by field name */
+  errors: Record<string, string>;
+  /** Currently focused field index */
+  activeFieldIndex: number;
+  /** Environment name (if editing env-specific binding) */
+  environmentName?: string;
+}
+
+/** Modal state for editing top-level config fields */
+export interface ConfigEditModalState {
+  type: "config_edit";
+  /** Config section being edited (e.g., "top-level", "build", "limits") */
+  section: string;
+  /** Current field values */
+  values: Record<string, unknown>;
+  /** Validation errors by field name */
+  errors: Record<string, string>;
+  /** Currently focused field index */
+  activeFieldIndex: number;
+  /** Environment name (if editing env-specific config) */
+  environmentName?: string;
+}
+
+/** Modal state for confirming deletion */
+export interface ConfirmDeleteModalState {
+  type: "confirm_delete";
+  /** Type of binding being deleted */
+  bindingType: FieldBindingType;
+  /** Index in the binding array */
+  bindingIndex: number;
+  /** Display name for confirmation message */
+  displayName: string;
+}
+
+/** Modal state for editing an environment */
+export interface EnvironmentEditModalState {
+  type: "environment_edit";
+  mode: EditMode;
+  /** Environment name (for edit mode) */
+  existingName?: string;
+  /** Current environment name value */
+  name: string;
+  /** Validation error */
+  error?: string;
+}
+
+/** Modal state for confirming environment deletion */
+export interface EnvironmentDeleteModalState {
+  type: "environment_delete";
+  /** Environment name to delete */
+  environmentName: string;
+}
+
+export type ModalState =
+  | DeployModalState
+  | TailModalState
+  | HelpModalState
+  | BindingTypeSelectModalState
+  | BindingEditModalState
+  | ConfigEditModalState
+  | ConfirmDeleteModalState
+  | EnvironmentEditModalState
+  | EnvironmentDeleteModalState;
 
 // Main application state
 export interface AppState {

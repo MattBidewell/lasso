@@ -1,6 +1,6 @@
 import { Runner, type RunnerCallbacks } from "../core/runner/index.ts";
 import { parseAnsiLine } from "../core/ansi.ts";
-import type { DeployOptions, TailOptions, SessionAction } from "../types.ts";
+import type { DeployOptions, TailOptions, SessionAction, FieldBindingType } from "../types.ts";
 import { createSessionId } from "../types.ts";
 import {
   state,
@@ -17,7 +17,12 @@ import {
   appendDebugLog,
   getSession,
   getSelectedSession,
+  setToastMessage,
+  addConfig,
 } from "./store.ts";
+import { fieldRegistry } from "../fields/index.ts";
+import { createJsoncEditor, isFileWritable } from "../core/config/index.ts";
+import { parseConfig } from "../core/discovery/index.ts";
 
 // Re-export closeModal for use by modals
 export { closeModal } from "./store.ts";
@@ -306,4 +311,259 @@ function buildCommand(action: SessionAction, configPath: string, environment: st
   const config = `-c ${configPath}`;
   const env = environment !== "default" ? `-e ${environment}` : "";
   return `${base} ${config} ${env}`.trim();
+}
+
+// ============ Binding CRUD Actions ============
+
+/**
+ * Save a binding to the config file (add or update)
+ */
+export function saveBinding(
+  bindingType: FieldBindingType,
+  data: Record<string, unknown>,
+  bindingIndex?: number
+): void {
+  const config = getSelectedConfig();
+  const env = getSelectedEnv();
+
+  if (!config) {
+    setToastMessage("No config selected");
+    return;
+  }
+
+  // Check if file is writable
+  if (!isFileWritable(config.path)) {
+    setToastMessage("Config file is read-only");
+    return;
+  }
+
+  const definition = fieldRegistry.getBindingType(bindingType);
+  if (!definition) {
+    setToastMessage("Unknown binding type");
+    return;
+  }
+
+  try {
+    const editor = createJsoncEditor(config.path);
+    const configKey = definition.configKey;
+
+    // Handle environment-specific bindings
+    const basePath = env !== "default" ? ["env", env] : [];
+
+    if (definition.isArray) {
+      // Array binding (kv_namespaces, d1_databases, etc.)
+      const arrayPath = [...basePath, configKey];
+      const existing = (editor.getPath(arrayPath) as unknown[]) ?? [];
+
+      if (bindingIndex !== undefined) {
+        // Update existing binding
+        existing[bindingIndex] = data;
+      } else {
+        // Add new binding
+        existing.push(data);
+      }
+
+      editor.set(arrayPath, existing);
+    } else {
+      // Object binding (ai, browser, images)
+      const objPath = [...basePath, configKey];
+      editor.set(objPath, data);
+    }
+
+    editor.save();
+
+    // Reload the config to update the UI
+    const updated = parseConfig(config.path, state.cwd);
+    addConfig(updated);
+
+    closeModal();
+    setToastMessage(bindingIndex !== undefined ? "Binding updated" : "Binding added");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to save binding";
+    setToastMessage(message);
+  }
+}
+
+/**
+ * Delete a binding from the config file
+ */
+export function deleteBinding(bindingType: FieldBindingType, bindingIndex: number): void {
+  const config = getSelectedConfig();
+  const env = getSelectedEnv();
+
+  if (!config) {
+    setToastMessage("No config selected");
+    return;
+  }
+
+  // Check if file is writable
+  if (!isFileWritable(config.path)) {
+    setToastMessage("Config file is read-only");
+    return;
+  }
+
+  const definition = fieldRegistry.getBindingType(bindingType);
+  if (!definition) {
+    setToastMessage("Unknown binding type");
+    return;
+  }
+
+  try {
+    const editor = createJsoncEditor(config.path);
+    const configKey = definition.configKey;
+
+    // Handle environment-specific bindings
+    const basePath = env !== "default" ? ["env", env] : [];
+
+    if (definition.isArray) {
+      // Array binding - remove item at index
+      const arrayPath = [...basePath, configKey];
+      const existing = (editor.getPath(arrayPath) as unknown[]) ?? [];
+
+      if (bindingIndex >= 0 && bindingIndex < existing.length) {
+        existing.splice(bindingIndex, 1);
+
+        if (existing.length === 0) {
+          // Remove empty array
+          editor.delete(arrayPath);
+        } else {
+          editor.set(arrayPath, existing);
+        }
+      }
+    } else {
+      // Object binding - delete the whole object
+      const objPath = [...basePath, configKey];
+      editor.delete(objPath);
+    }
+
+    editor.save();
+
+    // Reload the config to update the UI
+    const updated = parseConfig(config.path, state.cwd);
+    addConfig(updated);
+
+    closeModal();
+    setToastMessage("Binding deleted");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to delete binding";
+    setToastMessage(message);
+  }
+}
+
+// ============ Environment CRUD Actions ============
+
+/**
+ * Save an environment to the config file (add or rename)
+ */
+export function saveEnvironment(name: string, existingName?: string): void {
+  const config = getSelectedConfig();
+
+  if (!config) {
+    setToastMessage("No config selected");
+    return;
+  }
+
+  // Check if file is writable
+  if (!isFileWritable(config.path)) {
+    setToastMessage("Config file is read-only");
+    return;
+  }
+
+  // Validate environment name (must be valid identifier-like)
+  if (!name || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(name)) {
+    setToastMessage("Environment name must start with a letter and contain only letters, numbers, hyphens, and underscores");
+    return;
+  }
+
+  // Check if environment already exists (for add mode)
+  if (!existingName && config.environments.includes(name)) {
+    setToastMessage(`Environment "${name}" already exists`);
+    return;
+  }
+
+  // Check if renaming to an existing name
+  if (existingName && existingName !== name && config.environments.includes(name)) {
+    setToastMessage(`Environment "${name}" already exists`);
+    return;
+  }
+
+  try {
+    const editor = createJsoncEditor(config.path);
+
+    if (existingName && existingName !== name) {
+      // Rename: copy old env config to new name and delete old
+      const oldEnvConfig = editor.getPath(["env", existingName]);
+      if (oldEnvConfig !== undefined) {
+        editor.set(["env", name], oldEnvConfig);
+        editor.delete(["env", existingName]);
+      } else {
+        // No config for old env, just create empty new one
+        editor.set(["env", name], {});
+      }
+    } else if (!existingName) {
+      // Add new environment with empty config
+      editor.set(["env", name], {});
+    }
+
+    editor.save();
+
+    // Reload the config to update the UI
+    const updated = parseConfig(config.path, state.cwd);
+    addConfig(updated);
+
+    closeModal();
+    setToastMessage(existingName ? "Environment renamed" : "Environment added");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to save environment";
+    setToastMessage(message);
+  }
+}
+
+/**
+ * Delete an environment from the config file
+ */
+export function deleteEnvironment(environmentName: string): void {
+  const config = getSelectedConfig();
+
+  if (!config) {
+    setToastMessage("No config selected");
+    return;
+  }
+
+  // Don't allow deleting the default environment
+  if (environmentName === "default") {
+    setToastMessage("Cannot delete the default environment");
+    return;
+  }
+
+  // Check if file is writable
+  if (!isFileWritable(config.path)) {
+    setToastMessage("Config file is read-only");
+    return;
+  }
+
+  try {
+    const editor = createJsoncEditor(config.path);
+
+    // Delete the environment config
+    editor.delete(["env", environmentName]);
+
+    // Check if env object is now empty and remove it
+    const envObj = editor.getPath(["env"]);
+    if (envObj && typeof envObj === "object" && Object.keys(envObj).length === 0) {
+      editor.delete(["env"]);
+    }
+
+    editor.save();
+
+    // Reload the config to update the UI
+    const updated = parseConfig(config.path, state.cwd);
+    addConfig(updated);
+
+    closeModal();
+    setToastMessage("Environment deleted");
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to delete environment";
+    setToastMessage(message);
+  }
 }

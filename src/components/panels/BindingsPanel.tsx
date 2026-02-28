@@ -6,6 +6,9 @@ import {
   setFocusedPanel,
   getBindingEntries,
   selectBinding,
+  openBindingTypeSelect,
+  openEditBinding,
+  openDeleteBinding,
 } from "../../state/store.ts";
 
 export function BindingsPanel() {
@@ -58,6 +61,40 @@ export function BindingsPanel() {
         break;
       case "G":
         selectBinding(entries().length - 1);
+        break;
+      case "a":
+      case "A":
+        // Open binding type selection modal to add a new binding
+        openBindingTypeSelect();
+        break;
+      case "e":
+      case "E":
+      case "return":
+        // Open edit binding modal for selected binding
+        {
+          const entry = entries()[selectedIndex()];
+          if (entry) {
+            openEditBinding(
+              entry.fieldBindingType,
+              entry.typeIndex,
+              entry.raw as Record<string, unknown>
+            );
+          }
+        }
+        break;
+      case "d":
+      case "D":
+        // Open delete confirmation modal for selected binding
+        {
+          const entry = entries()[selectedIndex()];
+          if (entry) {
+            openDeleteBinding(
+              entry.fieldBindingType,
+              entry.typeIndex,
+              entry.normalized.displayName ?? entry.normalized.name
+            );
+          }
+        }
         break;
     }
   });
