@@ -68,21 +68,48 @@ export async function runUpdate(assumeYes: boolean): Promise<void> {
     await chmod(targetPath, 0o755);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("EACCES") || message.includes("permission")) {
+      throw new Error(
+        `Permission denied.\n` +
+        `Cannot write to ${targetPath}\n` +
+        `Try running with sudo or install to ~/.local/bin`
+      );
+    }
     throw new Error(`Failed to install update: ${message}`);
   }
 
   console.log(`Updated to v${latest} at ${targetPath}`);
 }
 
+function getHeaders(): HeadersInit {
+  const headers: HeadersInit = {
+    "User-Agent": "lasso",
+    "Accept": "application/vnd.github+json",
+  };
+
+  const token = process.env.GITHUB_TOKEN;
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  return headers;
+}
+
 async function fetchLatestRelease(): Promise<ReleaseInfo> {
   const response = await fetch(`${API_BASE}/releases/latest`, {
-    headers: {
-      "User-Agent": "lasso",
-      "Accept": "application/vnd.github+json",
-    },
+    headers: getHeaders(),
   });
 
   if (!response.ok) {
+    if (response.status === 403) {
+      const rateLimitRemaining = response.headers.get("x-ratelimit-remaining");
+      if (rateLimitRemaining === "0") {
+        throw new Error(
+          "GitHub API rate limit exceeded.\n" +
+          "Try again later or set GITHUB_TOKEN environment variable."
+        );
+      }
+    }
     throw new Error(`Failed to fetch release info: ${response.status}`);
   }
 
@@ -121,7 +148,7 @@ function selectAsset(assets: ReleaseAsset[]): ReleaseAsset | undefined {
 }
 
 async function downloadFile(url: string, outputPath: string): Promise<void> {
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: getHeaders() });
   if (!response.ok || !response.body) {
     throw new Error(`Download failed: ${response.status}`);
   }
