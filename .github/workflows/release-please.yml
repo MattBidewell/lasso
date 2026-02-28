@@ -19,9 +19,8 @@ jobs:
       - uses: googleapis/release-please-action@v4
         id: release
         with:
-          release-type: node
-          package-name: lasso
-          changelog-types: '[{"type":"feat","section":"Features"},{"type":"fix","section":"Fixes"},{"type":"chore","section":"Chores"}]'
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
   build:
     needs: release-please
@@ -31,11 +30,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Native builds - runner arch matches target arch
           - os: ubuntu-latest
             target: linux-x64
-          - os: ubuntu-latest
-            target: linux-arm64
-          - os: macos-latest
+          - os: macos-13
             target: darwin-x64
           - os: macos-14
             target: darwin-arm64
@@ -61,4 +59,33 @@ jobs:
           tag_name: ${{ needs.release-please.outputs.tag_name }}
           files: |
             dist/lasso-${{ matrix.target }}
+            scripts/install.sh
+
+  # Linux ARM64 requires QEMU emulation since GitHub doesn't have native ARM64 Linux runners
+  build-linux-arm64:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build in ARM64 container
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            oven/bun:latest \
+            sh -c "bun install && mkdir -p dist && BUILD_TARGET=bun-linux-arm64 BUILD_OUTFILE=dist/lasso-linux-arm64 bun run build"
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: |
+            dist/lasso-linux-arm64
             scripts/install.sh
