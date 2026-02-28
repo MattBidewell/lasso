@@ -93,11 +93,22 @@ release_info=$(curl "${curl_opts[@]}" "${release_url}" 2>&1) || {
   exit 1
 }
 
-# Extract version from release
-latest_version=$(echo "${release_info}" | grep -oE '"tag_name":\s*"[^"]+"' | head -1 | sed -E 's/.*"(v[^"]+)".*/\1/')
+# Extract version from release (handles both "v1.0.0" and "lasso-v1.0.0" formats)
+tag_name=$(echo "${release_info}" | grep -oE '"tag_name":\s*"[^"]+"' | head -1 | sed -E 's/"tag_name":\s*"([^"]+)"/\1/')
+
+if [[ -z "${tag_name}" ]]; then
+  echo "Error: Could not parse tag_name from GitHub response" >&2
+  exit 1
+fi
+
+# Extract just the version number (strip any prefix like "lasso-")
+latest_version=$(echo "${tag_name}" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+if [[ "${latest_version}" != v* ]]; then
+  latest_version="v${latest_version}"
+fi
 
 if [[ -z "${latest_version}" ]]; then
-  echo "Error: Could not parse version from GitHub response" >&2
+  echo "Error: Could not parse version from tag: ${tag_name}" >&2
   exit 1
 fi
 
