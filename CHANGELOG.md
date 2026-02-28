@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.0](https://github.com/MattBidewell/lasso/compare/v1.0.0...v1.1.0) (2026-02-28)
+
+
+### Features
+
+* add binding and environment editors ([4abb92d](https://github.com/MattBidewell/lasso/commit/4abb92d99cb57c8f7c4df34f29b8c6ace709757a))
+* remove agents ([8508abc](https://github.com/MattBidewell/lasso/commit/8508abc9dd8e657f877f1225ad94a4aff22232d1))
+
+
+### Bug Fixes
+
+* fix release pipeline and workflow ([6a2a48d](https://github.com/MattBidewell/lasso/commit/6a2a48db8fada7a89a8908974b45d1f904a2067a))
+
 ## 1.0.0 (2026-02-08)
 
 
