@@ -1,4 +1,4 @@
-name: release-please
+name: release
 
 on:
   push:
@@ -12,9 +12,53 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      - uses: google-github-actions/release-please-action@v4
+      - uses: googleapis/release-please-action@v4
+        id: release
         with:
           release-type: node
           package-name: lasso
           changelog-types: '[{"type":"feat","section":"Features"},{"type":"fix","section":"Fixes"},{"type":"chore","section":"Chores"}]'
+
+  build:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+          - os: ubuntu-latest
+            target: linux-arm64
+          - os: macos-latest
+            target: darwin-x64
+          - os: macos-14
+            target: darwin-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build binary
+        run: |
+          mkdir -p dist
+          BUILD_TARGET=bun-${{ matrix.target }} BUILD_OUTFILE=dist/lasso-${{ matrix.target }} bun run build
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          files: |
+            dist/lasso-${{ matrix.target }}
+            scripts/install.sh
