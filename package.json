@@ -1,6 +1,6 @@
 {
   "name": "lasso",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "TUI for managing Cloudflare Wrangler configs in monorepos",
   "type": "module",
   "bin": {

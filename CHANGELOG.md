@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.1](https://github.com/MattBidewell/lasso/compare/v1.1.0...v1.1.1) (2026-03-01)
+
+
+### Bug Fixes
+
+* release pipeline - 2 ([da128ac](https://github.com/MattBidewell/lasso/commit/da128ac5c1d189662a17f6eccf093760704128f3))
+* release pipeline - 3 ([d61d8d8](https://github.com/MattBidewell/lasso/commit/d61d8d8df5cddc98db38ba8c4c81778346b1aec6))
+
+
+### Miscellaneous
+
+* **main:** release lasso 1.1.0 ([163ebdd](https://github.com/MattBidewell/lasso/commit/163ebdd9df38cc82b16c2a91f5cceb7d3d1bca82))
+
 ## [1.1.0](https://github.com/MattBidewell/lasso/compare/lasso-v1.0.0...lasso-v1.1.0) (2026-02-28)
 
 
