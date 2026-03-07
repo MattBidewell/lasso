@@ -1,33 +1,226 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Configuration
 REPO="mattbidewell/lasso"
 BASE_URL="https://api.github.com/repos/${REPO}/releases"
 
-# Parse command line arguments
 VERSION=""
 INSTALL_PATH=""
 
+needs_sudo=false
+needs_path_update=false
+path_config_status=""
+shell_name=""
+shell_profile=""
+shell_reload_hint=""
+
+usage() {
+  echo "Usage: install.sh [--version <tag>] [--path <directory>]" >&2
+}
+
+fail() {
+  echo "Error: $1" >&2
+  exit 1
+}
+
+normalize_dir() {
+  local dir="$1"
+
+  while [[ "${dir}" != "/" && "${dir}" == */ ]]; do
+    dir="${dir%/}"
+  done
+
+  printf '%s\n' "${dir}"
+}
+
+path_has_dir() {
+  local needle
+  local entry
+
+  needle="$(normalize_dir "$1")"
+  IFS=':' read -r -a path_entries <<< "${PATH:-}"
+
+  for entry in "${path_entries[@]}"; do
+    [[ -z "${entry}" ]] && continue
+    if [[ "$(normalize_dir "${entry}")" == "${needle}" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+can_prepare_without_sudo() {
+  local dir="$1"
+
+  if [[ -d "${dir}" ]]; then
+    [[ -w "${dir}" ]]
+    return
+  fi
+
+  mkdir -p "${dir}" 2>/dev/null || return 1
+  [[ -w "${dir}" ]]
+}
+
+is_sudo_install_dir() {
+  case "$1" in
+    /usr/local/bin|/opt/homebrew/bin)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+detect_shell_profile() {
+  shell_name="$(basename "${SHELL:-sh}")"
+
+  case "${shell_name}" in
+    zsh)
+      shell_profile="${HOME}/.zprofile"
+      shell_reload_hint="exec zsh -l"
+      ;;
+    bash)
+      if [[ "$(uname -s)" == "Darwin" ]]; then
+        shell_profile="${HOME}/.bash_profile"
+      else
+        shell_profile="${HOME}/.profile"
+      fi
+      shell_reload_hint="source ${shell_profile}"
+      ;;
+    fish)
+      shell_profile="${HOME}/.config/fish/config.fish"
+      shell_reload_hint="source ${shell_profile}"
+      ;;
+    *)
+      shell_profile="${HOME}/.profile"
+      shell_reload_hint="source ${shell_profile}"
+      ;;
+  esac
+}
+
+configure_path() {
+  local install_dir="$1"
+  local marker
+  local profile_dir
+
+  if [[ -n "${INSTALL_PATH}" ]]; then
+    path_config_status="manual-required"
+    return 1
+  fi
+
+  case "${install_dir}" in
+    "${HOME}"/*) ;;
+    *)
+      path_config_status="manual-required"
+      return 1
+      ;;
+  esac
+
+  detect_shell_profile
+  profile_dir="$(dirname "${shell_profile}")"
+  mkdir -p "${profile_dir}" 2>/dev/null || {
+    path_config_status="manual-required"
+    return 1
+  }
+
+  marker="# Added by lasso installer for ${install_dir}"
+
+  if [[ -f "${shell_profile}" ]] && grep -Fqs "${marker}" "${shell_profile}"; then
+    path_config_status="already-configured"
+    return 0
+  fi
+
+  if [[ "${shell_name}" == "fish" ]]; then
+    {
+      printf '\n%s\n' "${marker}"
+      printf 'fish_add_path "%s"\n' "${install_dir}"
+    } >> "${shell_profile}" || {
+      path_config_status="manual-required"
+      return 1
+    }
+  else
+    {
+      printf '\n%s\n' "${marker}"
+      printf 'export PATH="%s:$PATH"\n' "${install_dir}"
+    } >> "${shell_profile}" || {
+      path_config_status="manual-required"
+      return 1
+    }
+  fi
+
+  path_config_status="updated"
+  return 0
+}
+
+choose_install_dir() {
+  local candidate
+
+  if [[ -n "${INSTALL_PATH}" ]]; then
+    printf '%s\n' "$(normalize_dir "${INSTALL_PATH}")"
+    return
+  fi
+
+  if [[ -n "${existing_path}" ]]; then
+    printf '%s\n' "$(normalize_dir "$(dirname "${existing_path}")")"
+    return
+  fi
+
+  for candidate in "${HOME}/.local/bin" "${HOME}/bin" "/opt/homebrew/bin" "/usr/local/bin"; do
+    if path_has_dir "${candidate}" && can_prepare_without_sudo "${candidate}"; then
+      printf '%s\n' "$(normalize_dir "${candidate}")"
+      return
+    fi
+  done
+
+  if can_prepare_without_sudo "${HOME}/.local/bin"; then
+    printf '%s\n' "${HOME}/.local/bin"
+    return
+  fi
+
+  for candidate in "/opt/homebrew/bin" "/usr/local/bin"; do
+    if path_has_dir "${candidate}"; then
+      printf '%s\n' "${candidate}"
+      return
+    fi
+  done
+
+  printf '%s\n' "${HOME}/.local/bin"
+}
+
+extract_version() {
+  local value="$1"
+  local version
+
+  version=$(printf '%s\n' "${value}" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || true)
+  if [[ -n "${version}" && "${version}" != v* ]]; then
+    version="v${version}"
+  fi
+
+  printf '%s\n' "${version}"
+}
+
 while [[ $# -gt 0 ]]; do
-  case $1 in
+  case "$1" in
     --version)
+      [[ $# -ge 2 ]] || fail "Missing value for --version"
       VERSION="$2"
       shift 2
       ;;
     --path)
+      [[ $# -ge 2 ]] || fail "Missing value for --path"
       INSTALL_PATH="$2"
       shift 2
       ;;
     *)
       echo "Unknown option: $1" >&2
-      echo "Usage: install.sh [--version <tag>] [--path <directory>]" >&2
+      usage
       exit 1
       ;;
   esac
 done
 
-# Detect OS and architecture
 os="$(uname -s)"
 arch="$(uname -m)"
 
@@ -35,9 +228,7 @@ case "${os}" in
   Darwin) os="darwin" ;;
   Linux) os="linux" ;;
   *)
-    echo "Error: Unsupported OS: ${os}" >&2
-    echo "Lasso supports macOS and Linux only." >&2
-    exit 1
+    fail "Unsupported OS: ${os}. Lasso supports macOS and Linux only."
     ;;
 esac
 
@@ -45,32 +236,27 @@ case "${arch}" in
   arm64|aarch64) arch="arm64" ;;
   x86_64|amd64) arch="x64" ;;
   *)
-    echo "Error: Unsupported architecture: ${arch}" >&2
-    echo "Lasso supports arm64 and x64 architectures only." >&2
-    exit 1
+    fail "Unsupported architecture: ${arch}. Lasso supports arm64 and x64 only."
     ;;
 esac
 
 asset="lasso-${os}-${arch}"
 
-# Build curl headers (support GITHUB_TOKEN for rate limit avoidance)
-curl_opts=(-fsSL)
+curl_opts=(-fsSL -H "Accept: application/vnd.github+json")
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then
   curl_opts+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
 fi
 
-# Detect existing installation
 existing_version=""
 existing_path=""
 if command -v lasso >/dev/null 2>&1; then
   existing_path="$(command -v lasso)"
-  existing_version=$(lasso --version 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "")
+  existing_version="$(extract_version "$(${existing_path} --version 2>/dev/null || true)")"
   if [[ -n "${existing_version}" ]]; then
     echo "Existing installation found: lasso ${existing_version} at ${existing_path}"
   fi
 fi
 
-# Fetch release info
 if [[ -n "${VERSION}" ]]; then
   echo "Fetching release ${VERSION}..."
   release_url="${BASE_URL}/tags/${VERSION}"
@@ -81,141 +267,127 @@ fi
 
 release_info=$(curl "${curl_opts[@]}" "${release_url}" 2>&1) || {
   error_msg="$release_info"
-  if echo "$error_msg" | grep -q "rate limit"; then
+  if printf '%s\n' "${error_msg}" | grep -qi "rate limit"; then
     echo "Error: GitHub API rate limit exceeded" >&2
-    echo "Try again later or set GITHUB_TOKEN environment variable for authenticated requests." >&2
+    echo "Try again later or set GITHUB_TOKEN for authenticated requests." >&2
     echo "  export GITHUB_TOKEN=your_token" >&2
-    echo "  curl -fsSL ... | bash" >&2
   else
     echo "Error: Failed to fetch release info from GitHub" >&2
-    echo "Could not reach GitHub API. Check your internet connection." >&2
+    echo "Could not reach GitHub API or the requested version does not exist." >&2
   fi
   exit 1
 }
 
-# Extract version from release (handles both "v1.0.0" and "lasso-v1.0.0" formats)
-tag_name=$(echo "${release_info}" | grep -oE '"tag_name":\s*"[^"]+"' | head -1 | sed -E 's/"tag_name":\s*"([^"]+)"/\1/')
+tag_name=$(printf '%s\n' "${release_info}" | grep -oE '"tag_name":\s*"[^"]+"' | head -n 1 | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/')
+[[ -n "${tag_name}" ]] || fail "Could not parse release version from GitHub response"
 
-if [[ -z "${tag_name}" ]]; then
-  echo "Error: Could not parse tag_name from GitHub response" >&2
-  exit 1
-fi
+latest_version="$(extract_version "${tag_name}")"
+[[ -n "${latest_version}" ]] || fail "Could not parse version from tag: ${tag_name}"
 
-# Extract just the version number (strip any prefix like "lasso-")
-latest_version=$(echo "${tag_name}" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-if [[ "${latest_version}" != v* ]]; then
-  latest_version="v${latest_version}"
-fi
-
-if [[ -z "${latest_version}" ]]; then
-  echo "Error: Could not parse version from tag: ${tag_name}" >&2
-  exit 1
-fi
-
-# Check if already up to date
 if [[ -n "${existing_version}" && "${existing_version}" == "${latest_version}" ]]; then
   echo "lasso ${existing_version} is already installed and up to date."
   exit 0
 fi
 
-# Determine install action
 if [[ -n "${existing_version}" ]]; then
   echo "Upgrading lasso ${existing_version} -> ${latest_version}..."
 else
   echo "Installing lasso ${latest_version}..."
 fi
 
-# Extract download URL
-download_url=$(echo "${release_info}" | grep -Eo '"browser_download_url":\s*"[^"]+"' | sed -E 's/"browser_download_url":\s*"(.*)"/\1/' | grep "${asset}$" | head -n 1)
+download_url="https://github.com/${REPO}/releases/download/${tag_name}/${asset}"
+install_dir="$(choose_install_dir)"
 
-if [[ -z "${download_url}" ]]; then
-  echo "Error: Could not find a release asset for ${asset}" >&2
-  echo "Available assets may not include your platform (${os}-${arch})." >&2
-  exit 1
-fi
-
-# Determine install directory
-if [[ -n "${INSTALL_PATH}" ]]; then
-  install_dir="${INSTALL_PATH}"
-elif [[ -n "${existing_path}" ]]; then
-  install_dir="$(dirname "${existing_path}")"
-else
-  install_dir="${HOME}/.local/bin"
-  if [[ ! -d "${install_dir}" ]]; then
-    mkdir -p "${install_dir}" 2>/dev/null || true
-  fi
-  if [[ ! -w "${install_dir}" ]]; then
-    install_dir="/usr/local/bin"
-  fi
-fi
-
-# Verify we can write to install directory
 if [[ ! -d "${install_dir}" ]]; then
   mkdir -p "${install_dir}" 2>/dev/null || {
     echo "Error: Cannot create directory ${install_dir}" >&2
-    echo "Try running with --path to specify a different location, or:" >&2
-    echo "  mkdir -p ~/.local/bin" >&2
-    echo "  curl -fsSL ... | bash" >&2
+    echo "Try one of these options:" >&2
+    echo "  1. Create ~/.local/bin manually" >&2
+    echo "  2. Re-run with --path /your/path" >&2
+    echo "  3. Re-run with sudo if installing to a system directory" >&2
     exit 1
   }
 fi
 
-# Check write permissions
-needs_sudo=false
 if [[ ! -w "${install_dir}" ]]; then
-  if [[ "${install_dir}" == "/usr/local/bin" ]]; then
+  if is_sudo_install_dir "${install_dir}"; then
     needs_sudo=true
   else
     echo "Error: Permission denied" >&2
     echo "Cannot write to ${install_dir}" >&2
-    echo "" >&2
-    echo "Options:" >&2
-    echo "  1. Create ~/.local/bin and ensure it's in your PATH:" >&2
-    echo "     mkdir -p ~/.local/bin" >&2
-    echo "  2. Run with sudo for /usr/local/bin:" >&2
-    echo "     curl -fsSL ... | sudo bash" >&2
-    echo "  3. Specify a custom path:" >&2
-    echo "     curl -fsSL ... | bash -s -- --path /your/path" >&2
+    echo "Try one of these options:" >&2
+    echo "  1. Re-run with --path /your/path" >&2
+    echo "  2. Create ~/.local/bin manually and re-run" >&2
+    echo "  3. Re-run with sudo for /usr/local/bin or /opt/homebrew/bin" >&2
     exit 1
   fi
 fi
 
-# Download binary
+if ! path_has_dir "${install_dir}"; then
+  needs_path_update=true
+fi
+
 echo "Downloading lasso ${latest_version} for ${os}-${arch}..."
 tmp="$(mktemp)"
 trap 'rm -f "${tmp}"' EXIT
 
 curl "${curl_opts[@]}" "${download_url}" -o "${tmp}" || {
-  echo "Error: Failed to download binary" >&2
-  echo "Check your internet connection and try again." >&2
+  echo "Error: Failed to download binary package for ${asset}" >&2
+  echo "Expected URL: ${download_url}" >&2
   exit 1
 }
 
-chmod +x "${tmp}"
+chmod 0755 "${tmp}"
 
-# Install binary
 target_path="${install_dir}/lasso"
 if [[ "${needs_sudo}" == "true" ]]; then
   echo "Installing to ${target_path} (requires sudo)..."
-  sudo mv "${tmp}" "${target_path}"
+  sudo install -m 0755 "${tmp}" "${target_path}"
 else
   echo "Installing to ${target_path}..."
-  mv "${tmp}" "${target_path}"
+  install -m 0755 "${tmp}" "${target_path}"
 fi
 
-# Success message
+installed_version="$("${target_path}" --version 2>/dev/null || true)"
+[[ -n "${installed_version}" ]] || fail "Install completed, but ${target_path} did not return a version"
+
+if [[ "${needs_path_update}" == "true" ]]; then
+  configure_path "${install_dir}" || true
+fi
+
 if [[ -n "${existing_version}" ]]; then
-  echo "Successfully upgraded to lasso ${latest_version}"
+  echo "Successfully upgraded to ${installed_version}"
 else
-  echo "Successfully installed lasso ${latest_version}"
+  echo "Successfully installed ${installed_version}"
+fi
+echo "Installed path: ${target_path}"
+
+if [[ "${needs_path_update}" == "true" ]]; then
   echo ""
-  echo "Run 'lasso' to get started."
+  case "${path_config_status}" in
+    updated)
+      echo "Added ${install_dir} to your PATH in ${shell_profile}."
+      echo "Open a new terminal or run:"
+      echo "  ${shell_reload_hint}"
+      ;;
+    already-configured)
+      echo "${install_dir} is already configured in ${shell_profile}."
+      echo "If this shell was opened before installation, run:"
+      echo "  ${shell_reload_hint}"
+      ;;
+    *)
+      echo "Note: ${install_dir} is not currently on your PATH."
+      echo "Add it manually with:"
+      if [[ "${shell_name}" == "fish" ]]; then
+        echo "  fish_add_path ${install_dir}"
+      else
+        echo "  export PATH=\"${install_dir}:\$PATH\""
+      fi
+      ;;
+  esac
 fi
 
-# Check if in PATH
-if ! command -v lasso >/dev/null 2>&1; then
-  echo ""
-  echo "Note: ${install_dir} is not in your PATH."
-  echo "Add it to your shell profile:"
-  echo "  export PATH=\"${install_dir}:\$PATH\""
-fi
+echo ""
+echo "Then refresh command lookup if needed:"
+echo "  hash -r 2>/dev/null || true"
+echo "Run 'lasso --version' to verify the install."
