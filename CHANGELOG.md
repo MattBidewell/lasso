@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/MattBidewell/lasso/compare/v1.1.1...v1.1.2) (2026-03-07)
+
+
+### Bug Fixes
+
+* make release installer usable after install ([ab9fb9a](https://github.com/MattBidewell/lasso/commit/ab9fb9a7a668702f35693cff6506e8ac4dcb071b))
+
 ## [1.1.1](https://github.com/MattBidewell/lasso/compare/v1.1.0...v1.1.1) (2026-03-01)
 
 
