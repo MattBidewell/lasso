@@ -7,22 +7,22 @@ A TUI (Terminal User Interface) for managing Cloudflare Wrangler configs in mono
 ### Quick Install (Recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mattbidewell/lasso/main/scripts/install.sh | bash
+curl -fsSL https://github.com/mattbidewell/lasso/releases/latest/download/install.sh | bash
 ```
 
-The install script automatically detects your platform and installs the appropriate binary.
+The install script automatically detects your platform, downloads the matching binary, and installs it to a writable directory already on your `PATH` when possible. If it needs to use `~/.local/bin`, it will also update your shell profile for you.
 
 ### Install Options
 
 ```bash
 # Install specific version
-curl -fsSL https://raw.githubusercontent.com/mattbidewell/lasso/main/scripts/install.sh | bash -s -- --version v1.0.0
+curl -fsSL https://github.com/mattbidewell/lasso/releases/latest/download/install.sh | bash -s -- --version v1.0.0
 
 # Install to custom path
-curl -fsSL https://raw.githubusercontent.com/mattbidewell/lasso/main/scripts/install.sh | bash -s -- --path /custom/path
+curl -fsSL https://github.com/mattbidewell/lasso/releases/latest/download/install.sh | bash -s -- --path /custom/path
 
 # Use with GITHUB_TOKEN (to avoid rate limits)
-GITHUB_TOKEN=your_token curl -fsSL https://raw.githubusercontent.com/mattbidewell/lasso/main/scripts/install.sh | bash
+GITHUB_TOKEN=your_token curl -fsSL https://github.com/mattbidewell/lasso/releases/latest/download/install.sh | bash
 ```
 
 ### Manual Download
