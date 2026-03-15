@@ -1,5 +1,14 @@
 # lasso
 
+```
+  ██╗      █████╗ ███████╗███████╗ ██████╗ 
+  ██║     ██╔══██╗██╔════╝██╔════╝██╔═══██╗
+  ██║     ███████║███████╗███████╗██║   ██║
+  ██║     ██╔══██║╚════██║╚════██║██║   ██║
+  ███████╗██║  ██║███████║███████║╚██████╔╝
+  ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝ ╚═════╝
+```
+
 A TUI (Terminal User Interface) for managing Cloudflare Wrangler configs in monorepos. Navigate between workers, environments, and quickly run dev servers or deploy.
 
 ## Installation
